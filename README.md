@@ -39,11 +39,14 @@ opens the cards by hand.
 - `roles/<role>/ROLE.md`: the role. `modes/`: 1 file per mode.
 - `roles/<role>/cards/`: the rules. `cards/INDEX.md` lists them.
 - `tools/cards.py`: the card gate. `tools/test_cards.py`: its tests.
+- `tools/scrub.py`: the secret and private data scan for a release.
+  `tools/test_scrub.py`: its tests.
+- `RELEASE.md`: the public release checklist.
 - `SOURCES.md`: every source behind the cards.
 - `THIRD-PARTY-NOTICES.md`: licences for copied material.
 
 ## Tests
 
 ```
-python -m unittest discover -s tools -p test_cards.py
+python -m unittest discover -s tools -p "test_*.py"
 ```
