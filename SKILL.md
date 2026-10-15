@@ -51,7 +51,8 @@ A card is 1 rule with its source. Cards live in `roles/<role>/cards/`, and
 load only through `python <skill dir>/tools/cards.py <role> <mode> <step>`.
 Run it before each step. Run `... <role> <mode> policy` at the start.
 At the policy step, any exit other than 0 means stop, as in step 2. For each
-printed card, say in 1 line whether its trigger fits the task now. Use only those that fit. Cite each by id.
+printed card, say in 1 line whether its trigger fits the task now. Use only
+those that fit. Cite each by id.
 If Python is missing, open the step's cards by hand and say so. Check status
 and mode yourself. A policy card that fails the gate still means stop.
 
