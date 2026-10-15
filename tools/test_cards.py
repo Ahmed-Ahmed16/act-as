@@ -240,9 +240,8 @@ class CardGateTests(unittest.TestCase):
                     self.assertEqual(run.stdout, '')
                     self.assertEqual(len(run.stderr.splitlines()), 1)
 
-    @unittest.expectedFailure
     def test_policy_step_with_no_policy_cards_blocks_the_role(self):
-        # Bug, not fixed yet: a ROLE.md that names no policy card passes the policy step with exit 0.
+        # A ROLE.md that names no policy card must not pass the policy step.
         # Known pass is test_policy_all_approved_prints_each_required_card.
         for rules in ['- `TST-888` Other rule\n', '* `TST-P01` Star bullet\n* `TST-P02` Star bullet\n']:
             with self.subTest(rules=rules):
@@ -250,15 +249,19 @@ class CardGateTests(unittest.TestCase):
                     f'# Tester\n## 3. Rules\n{rules}Cards for every mode:\n- `TST-501`\n', encoding='utf-8')
                 run = self.run_gate('tester', 'code', 'policy')
                 self.assertEqual(run.returncode, 3, run.stdout)
+                self.assertIn('BLOCKED ROLE.md: names no policy card\n', run.stdout)
 
-    @unittest.expectedFailure
-    def test_second_status_line_cannot_open_a_draft_card(self):
-        # Bug, not fixed yet: the last status line wins, so a draft card with a later approved line loads.
+    def test_repeated_status_or_mode_line_keeps_a_card_closed(self):
+        # A second status or mode line must not open a card, whatever it says.
         # Known pass is test_only_exact_approved_status_opens_a_step_card.
-        (self.role / 'cards/TST-001.md').write_text(
-            'id: TST-001\nstatus: draft\nmode: all\nstatus: approved\n', encoding='utf-8')
-        run = self.run_gate('tester', 'code', '2')
-        self.assertNotIn('id: TST-001\n', run.stdout)
+        for body, reason in [('status: draft\nmode: all\nstatus: approved\n', 'status repeated'),
+                             ('status: approved\nmode: site\nmode: code\n', 'mode repeated')]:
+            with self.subTest(reason=reason):
+                (self.role / 'cards/TST-001.md').write_text(f'id: TST-001\n{body}', encoding='utf-8')
+                run = self.run_gate('tester', 'code', '2')
+                self.assertEqual(run.returncode, 0, run.stderr)
+                self.assertIn(f'SKIPPED TST-001: {reason}\n', run.stdout)
+                self.assertNotIn('id: TST-001\n', run.stdout)
 
 
 class RealTesterRoleTests(unittest.TestCase):
