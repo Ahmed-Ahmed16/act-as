@@ -44,7 +44,11 @@ def card_body(role_dir, mode, card_id):
         return '', 'missing'
     except (OSError, UnicodeError):
         return '', 'unreadable'
-    fields = dict(re.findall(r'^([\w-]+): *(.*)$', body, re.M))
+    pairs = re.findall(r'^([\w-]+): *(.*)$', body, re.M)
+    fields = dict(pairs)
+    for key in ('status', 'mode'):
+        if [name for name, _ in pairs].count(key) > 1:
+            return '', f'{key} repeated'
     status, modes = fields.get('status', 'missing'), fields.get('mode', 'missing')
     if status != 'approved':
         return '', f'status {status}'
@@ -54,6 +58,8 @@ def card_body(role_dir, mode, card_id):
 
 def show_cards(role_dir, mode, step):
     cards = [(card_id, *card_body(role_dir, mode, card_id)) for card_id in selected_ids(role_dir, mode, step)]
+    if step == 'policy' and not cards:
+        cards = [('ROLE.md', '', 'names no policy card')]
     skipped = sum(bool(reason) for _, _, reason in cards)
     print(f'cards.py {role_dir.name} {mode} {step}: {len(cards) - skipped} printed, {skipped} skipped')
     for card_id, body, reason in cards:
