@@ -30,6 +30,9 @@ What is done, what is next, and what is still untested. Updated 2026-10-15.
    - cards TST-301 to TST-312 cite a third party summary of a book: keep or
      drop;
    - a fresh scrub and token scan of the exact commit.
+   The checklist is `RELEASE.md`. The scan tool is `tools/scrub.py`, tested by
+   `tools/test_scrub.py`; it is ready, but the scan of the release commit has
+   not been run yet, because that commit does not exist yet.
 2. **Developer role, v1.1.** Clean room work for rebuilds, a flag for repos
    with no architecture doc, delegation of implementation, small patches.
 3. **Manager role, v1.2.** A status page: done, open, top 3 risks, next 3
