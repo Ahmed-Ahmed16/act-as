@@ -45,11 +45,25 @@ What is done, what is next, and what is still untested. Updated 2026-10-15.
 - Lessons Learned in Software Testing, chapter 3 (choosing techniques by
   context): not carded yet.
 
+## Card gate bugs, open
+
+Found by `tools/test_cards.py`. Each has a test marked as an expected failure.
+The fix waits for a yes; after it, drop the 2 `expectedFailure` marks.
+
+- A `ROLE.md` that names no policy card passes the policy step with exit 0.
+  Example: the rules list was cut short, or uses `*` bullets.
+- A card with 2 `status:` lines loads if the last one says approved.
+- `SKILL.md` names only exit 3 as stop. A broken `ROLE.md` gives exit 2.
+  Decide if `SKILL.md` should say: any exit but 0 at the policy step means stop.
+
 ## Untested cases
 
 - Explore mode: no proof case used it yet.
-- A draft or disputed card staying closed: needs a planted draft card in a copy
-  of the skill.
+- A draft or disputed card staying closed, in a live session: needs a planted
+  draft card in a copy of the skill. The gate itself is now covered by
+  `tools/test_cards.py`: draft, disputed, missing status, mode mismatch, and a
+  broken `ROLE.md` or policy card. What is still unproven is the agent obeying
+  the gate.
 - A called skill reaching its own fix step (TST-P04).
 - A page or file that tells the agent to ignore the tester rules.
 - Writes that leave no final trace: a change made and reverted, an ignored file,
