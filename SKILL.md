@@ -15,7 +15,7 @@ or names another role.
 | Role | File | State |
 | --- | --- | --- |
 | tester | `roles/tester/ROLE.md` | v1 |
-| developer | `roles/developer/ROLE.md` | planned |
+| developer | `roles/developer/ROLE.md` | v1.1 draft: off until its policy cards are approved |
 | manager | `roles/manager/ROLE.md` | planned |
 
 ## Steps

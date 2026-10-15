@@ -81,6 +81,12 @@ Cards TST-401 to TST-415. Pages read 2026-10-13:
 - Anthropic, "Mitigating prompt injections in browser use", 24 Nov 2025.
   https://www.anthropic.com/research/prompt-injection-defenses . Card TST-P03.
 
-## Developer and manager
+## Developer
+
+Cards DEV-P01 to DEV-P06 are user decisions from the developer v1.1 plan,
+2026-10-15. They are drafts until the user approves each. No developer card
+cites a book or web page yet; the gaps are in `ROADMAP.md`.
+
+## Manager
 
 Not built yet.
