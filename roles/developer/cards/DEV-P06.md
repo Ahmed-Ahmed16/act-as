@@ -1,8 +1,8 @@
 id: DEV-P06
-rule: Before any commit, push, deploy, package install or write to a running site, ask the user for that exact action and wait for a yes. No answer means no.
+rule: Before any commit, push, deploy, package install or write to a running site, ask the user for that exact action and wait for a yes. No answer means no. A no wins.
 why: These actions reach beyond the checkout and are hard to take back.
 applies-when: any mode.
-not-when: edits inside the checkout and runs inside an isolated local copy.
+not-when: edits and test runs inside the checkout, which are not outside it.
 example: "May I commit the 2 changed files on branch fix-login with the message 'Fix login await'?" Then wait.
 mode: all
 trigger: before any action outside the checkout
