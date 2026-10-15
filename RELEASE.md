@@ -5,11 +5,11 @@ public. Each decision is the owner's; nothing here is chosen yet.
 
 ## Decisions
 
-- [x] **Licence** for this repo's own text and code: `CC0 1.0`, in `LICENSE`.
+- [x] **Licence** for this repo's own text and code: `MIT`, in `LICENSE`.
   The borrowed pstack files keep their MIT licence either way; see
   `THIRD-PARTY-NOTICES.md`.
-- [ ] **Short book quotes** in card `anchor` fields: keep, shorten, or drop.
-  Decision: `___`.
+- [x] **Short book quotes** in card `anchor` fields: keep, shorten, or drop.
+  Decision: `keep`, 2026-10-15.
 - [ ] **Cards TST-301 to TST-312** cite a third party summary of
   *More Agile Testing*, not the book (see `SOURCES.md`): keep or drop.
   Decision: `___`.
