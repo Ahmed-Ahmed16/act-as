@@ -5,7 +5,7 @@ public. Each decision is the owner's; nothing here is chosen yet.
 
 ## Decisions
 
-- [ ] **Licence** for this repo's own text and code: `___`.
+- [x] **Licence** for this repo's own text and code: `CC0 1.0`, in `LICENSE`.
   The borrowed pstack files keep their MIT licence either way; see
   `THIRD-PARTY-NOTICES.md`.
 - [ ] **Short book quotes** in card `anchor` fields: keep, shorten, or drop.
