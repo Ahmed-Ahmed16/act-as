@@ -50,3 +50,14 @@ opens the cards by hand.
 ```
 python -m unittest discover -s tools -p "test_*.py"
 ```
+
+## Licence
+
+This repo's own text and code are released under CC0 1.0. You may copy,
+change, and share them with no conditions. The full text is in `LICENSE`.
+
+Some files are not covered by CC0:
+
+- `roles/tester/borrowed/pstack/` stays under its own MIT licence.
+- Short quotes from books in card `anchor` fields belong to their authors.
+- See `THIRD-PARTY-NOTICES.md` for details.
