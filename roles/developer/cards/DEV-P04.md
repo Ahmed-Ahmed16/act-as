@@ -9,4 +9,4 @@ trigger: before the first change to a repo
 kind: user-policy
 source: user decision, developer v1.1 plan, 2026-10-15 (pending card approval)
 status: draft
-review: none yet; the user approves policy cards
+review: second model check against PLAN.md, 2026-10-15: added exceptions removed; the user approves policy cards

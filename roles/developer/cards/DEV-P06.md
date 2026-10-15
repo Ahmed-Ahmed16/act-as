@@ -9,5 +9,5 @@ trigger: before any action outside the checkout
 kind: user-policy
 source: user decision, developer v1.1 plan, 2026-10-15 (pending card approval)
 status: draft
-review: none yet; the user approves policy cards
+review: second model check against PLAN.md, 2026-10-15: added exceptions removed; the user approves policy cards
 extra: A no wins and lasts for the session until the user lifts it, as in TST-P03.
