@@ -36,8 +36,6 @@ Before each step, run `cards.py tester site <step>`.
    - Shadow copies and dark launches: users see only the current version
      (`TST-411`); storage is read only or separate (`TST-412`).
 7. **Report** each bug per `TST-P01`, `TST-P02`, `TST-215`, with screenshots.
-   Plan and show the work: `TST-301`, `TST-311`; distributed teams `TST-310`;
-   regulated releases `TST-312`.
 
 ## Finish checklist
 
