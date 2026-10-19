@@ -90,4 +90,16 @@ cites a book or web page yet; the gaps are in `ROADMAP.md`.
 
 ## Manager
 
-Not built yet.
+Cards MGR-P01 to MGR-P05 are user decisions from the manager v1.2 plan,
+2026-10-19, still draft. Cards MGR-001 to MGR-006, all draft, each checked
+against its raw source by a second model:
+
+- GOV.UK Service Manual, "Governance principles for agile service delivery",
+  last updated 23 May 2016, read 2026-10-19.
+  https://www.gov.uk/service-manual/governance/governance-principles .
+  Cards MGR-001, MGR-002.
+- Frederick P. Brooks, The Mythical Man-Month, Anniversary Edition,
+  Addison-Wesley 1995. Cards MGR-003, MGR-004.
+- Tom DeMarco and Timothy Lister, Waltzing with Bears, Dorset House 2003.
+  Card MGR-005.
+- Scott Berkun, Making Things Happen, O'Reilly 2008. Card MGR-006.

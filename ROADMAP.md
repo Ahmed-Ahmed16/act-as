@@ -38,8 +38,11 @@ What is done, what is next, and what is still untested. Updated 2026-10-19.
    modes fix, build and rebuild, and 6 policy cards (DEV-P01 to DEV-P06),
    approved by the user on 2026-10-19 after a second model check. The 2
    switch test findings are fixed. Next: source the mode cards.
-3. **Manager role, v1.2.** A status page: done, open, top 3 risks, next 3
-   steps, which role runs each. No code, no tests.
+3. **Manager role, v1.2: drafted 2026-10-19.** Modes status and plan, 5 policy
+   cards (MGR-P01 to MGR-P05) and 6 source cards (MGR-001 to MGR-006), all
+   draft, so the role stays off. Next: user approval of each card, then the
+   behaviour test (Arm A: read only page; Arm B: refuses to fix, also on a
+   smaller model, after `/compact`, and under an urgent ask).
 4. **Security role**, later.
 5. **v2: measure tokens** at task start and over long sessions.
 6. **v3: other agents.** Run the roles under Codex and OpenCode.
@@ -52,6 +55,10 @@ Tester:
 - A public article on end to end testing practice: not carded yet.
 - Lessons Learned in Software Testing, chapter 3 (choosing techniques by
   context): not carded yet.
+
+Manager:
+
+- Peopleware (2nd edition): not carded yet.
 
 Developer:
 
@@ -100,6 +107,8 @@ Findings:
   to lift DEV-P03.
 
 ## Untested cases
+
+- Manager: the whole behaviour test, Arm A and Arm B.
 
 - Explore mode: no proof case used it yet.
 - A draft or disputed card staying closed, in a live session: needs a planted

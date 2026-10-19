@@ -16,7 +16,7 @@ or names another role.
 | --- | --- | --- |
 | tester | `roles/tester/ROLE.md` | v1 |
 | developer | `roles/developer/ROLE.md` | v1.1, not yet proven |
-| manager | `roles/manager/ROLE.md` | planned |
+| manager | `roles/manager/ROLE.md` | v1.2 draft, off until its cards are approved |
 
 ## Steps
 
