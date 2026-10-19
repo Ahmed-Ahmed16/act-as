@@ -15,7 +15,7 @@ or names another role.
 | Role | File | State |
 | --- | --- | --- |
 | tester | `roles/tester/ROLE.md` | v1 |
-| developer | `roles/developer/ROLE.md` | planned |
+| developer | `roles/developer/ROLE.md` | v1.1, not yet proven |
 | manager | `roles/manager/ROLE.md` | planned |
 
 ## Steps
@@ -48,8 +48,9 @@ disagree on local detail (naming, layout, commands), the repo wins.
 ## Cards
 
 A card is 1 rule with its source. Cards live in `roles/<role>/cards/`, and
-load only through `python <skill dir>/tools/cards.py <role> <mode> <step>`.
-Run it before each step. Run `... <role> <mode> policy` at the start.
+load only through `python <skill dir>/tools/cards.py <role> <mode> <step number>`.
+Run it before each step. The step number is the digit in the mode file's
+step list, never the step name: `cards.py tester code 1`, not `... setup`. Run `... <role> <mode> policy` at the start.
 At the policy step, any exit other than 0 means stop, as in step 2. For each
 printed card, say in 1 line whether its trigger fits the task now. Use only
 those that fit. Cite each by id.

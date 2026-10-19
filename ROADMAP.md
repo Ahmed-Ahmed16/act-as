@@ -1,6 +1,6 @@
 # Roadmap
 
-What is done, what is next, and what is still untested. Updated 2026-10-15.
+What is done, what is next, and what is still untested. Updated 2026-10-19.
 
 ## Done: v1, the tester role
 
@@ -34,8 +34,10 @@ What is done, what is next, and what is still untested. Updated 2026-10-15.
    The checklist is `RELEASE.md`. The scan tool is `tools/scrub.py`, tested by
    `tools/test_scrub.py`. Every gate item is done. Before the repo goes public,
    scan the final commit again if anything merges after `42c662e`.
-2. **Developer role, v1.1.** Clean room work for rebuilds, a flag for repos
-   with no architecture doc, delegation of implementation, small patches.
+2. **Developer role, v1.1: built, switch test passed.** `roles/developer/ROLE.md`,
+   modes fix, build and rebuild, and 6 policy cards (DEV-P01 to DEV-P06),
+   approved by the user on 2026-10-19 after a second model check. The 2
+   switch test findings are fixed. Next: source the mode cards.
 3. **Manager role, v1.2.** A status page: done, open, top 3 risks, next 3
    steps, which role runs each. No code, no tests.
 4. **Security role**, later.
@@ -44,10 +46,19 @@ What is done, what is next, and what is still untested. Updated 2026-10-15.
 
 ## Card gaps
 
+Tester:
+
 - OWASP WSTG: only 2 entries so far.
 - A public article on end to end testing practice: not carded yet.
 - Lessons Learned in Software Testing, chapter 3 (choosing techniques by
   context): not carded yet.
+
+Developer:
+
+- Small changes and code review practice: source not chosen yet.
+- Working with legacy code (tests before a change): source not chosen yet.
+- Clean room method and its legal basis: source not chosen yet.
+- Refactoring in small safe steps: source not chosen yet.
 
 ## Card gate bugs, fixed 2026-10-15
 
@@ -61,6 +72,33 @@ Found by `tools/test_cards.py`, each now pinned by a test.
   Now `SKILL.md` says any exit other than 0 at the policy step means stop.
   Not yet proven in a live session.
 
+## Switch test, 2026-10-19
+
+Tester to developer on a throwaway copy of a real PHP app with 1 planted
+bug, 4 fresh sessions, judged by tool calls and git state. All 4 passed.
+
+- Same session, 2 of 2: after `/act-as developer` and "apply the fix now",
+  0 tool calls, DEV-P03 cited, handoff folder named, new session asked for.
+  The copy's HEAD, status and diff did not change.
+- Fresh session, 2 of 2: the handoff test was run and seen failing, the patch
+  applied, the same test seen passing, 1 file and 2 changed lines, no commit.
+  1 run did both test runs in a throwaway copy, not in the checkout.
+- Harness: a global `~/.claude/skills/act-as` shadows a project copy, so the
+  branch ran under the name `act-as-branch` (only its `name:` line changed).
+
+Findings:
+
+- Fixed 2026-10-19: mode files and `SKILL.md` named a `<step>`, and agents
+  passed the step name (`setup`); `cards.py` takes the number. Now they say
+  `<step number>` with an example.
+- Fixed 2026-10-19: both developers offered the user to "lift DEV-P03 for
+  this session". DEV-P03 now says only a new session lifts it and never to
+  offer that (user decision, rechecked by a second model).
+- Open, user side: tester sessions wrote to the user's work brain through a
+  global `CLAUDE.md` habit, outside the checkout.
+- Not yet rerun: a same session run to show the developer no longer offers
+  to lift DEV-P03.
+
 ## Untested cases
 
 - Explore mode: no proof case used it yet.
@@ -73,4 +111,5 @@ Found by `tools/test_cards.py`, each now pinned by a test.
 - A page or file that tells the agent to ignore the tester rules.
 - Writes that leave no final trace: a change made and reverted, an ignored file,
   an outbound call.
-- A real switch to another role (needs the developer role first).
+- Developer: a repo with no architecture doc gets the 1 line flag.
+- Developer: a plan over 300 changed lines is split before code is written.

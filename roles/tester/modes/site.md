@@ -6,7 +6,8 @@ that passed the isolation check counts as a copy, not a running site.
 
 ## Steps
 
-Before each step, run `cards.py tester site <step>`.
+Before each step, run `cards.py tester site <step number>`, for example
+`cards.py tester site 1`. The step number is the digit, never the step name.
 
 1. **Name the target.** Live site, staging, or a local server. For a live site,
    the user named it in this session; that allows reading only. Done when the

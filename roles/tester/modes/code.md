@@ -6,7 +6,8 @@ a throwaway copy. The source checkout stays untouched.
 
 ## Steps
 
-Before each step, run `cards.py tester code <step>`.
+Before each step, run `cards.py tester code <step number>`, for example
+`cards.py tester code 1`. The step number is the digit, never the step name.
 
 1. **Set up.** Read the repo's test docs and runner config. Confirm the copy is
    isolated (`TST-P03`: test database, test accounts, mail caught, no
