@@ -74,18 +74,6 @@ only `approved` cards. Policy cards (`TST-P`) always apply.
 | TST-215 | code, site, explore | writing a bug report | approved | A bug report states the steps, what should have happened, and what actually happened. |
 | TST-216 | code, explore | deciding where a bug is recorded | approved | Use a defect tracking system when the team is distributed, needs audit or release recor... |
 | TST-217 | code, explore | a test task is stuck or blocks a story | approved | Treat quality as the whole team's job, and ask a teammate for help when a test task is ... |
-| TST-301 | code, site, explore | Before testing starts on a release, feature, or story | approved | Plan testing at four levels, release, feature, story and task, each at its own depth. |
-| TST-302 | explore | When tracking test coverage and pending testing work | approved | Show test coverage, progress, and pending tests on a mind map or a testing matrix. |
-| TST-303 | explore | A feature is proposed and its purpose is still unclear | approved | Understand a feature's purpose as the team shapes its test strategy. |
-| TST-304 | explore | A feature is at the idea stage, before the build starts | approved | Start test thinking while a feature is still an idea, before any code exists. |
-| TST-305 | code | Defining expected behavior before coding a story | approved | Work directly with end users to collect real examples of the behavior they want, then t... |
-| TST-306 | code | Writing acceptance examples with stakeholders | approved | Avoid examples so complicated that they obscure their main purpose. |
-| TST-307 | explore | Starting an exploratory session or running short of test ideas | approved | Use personas and tours to generate exploratory test ideas. |
-| TST-308 | code | Setting up test data for an automated run | approved | Use automation to keep test data valid and usable, so feedback stays fast. |
-| TST-309 | code | Automated suite maintenance grows, or flaky tests appear | approved | Make technical debt in automated tests visible, and discuss it with the whole team. |
-| TST-310 | code, site, explore | Testing work is spread across sites or time zones | approved | On distributed teams, treat collaboration tools as important for working across time zo... |
-| TST-311 | code, site, explore | Planning testing work or reporting its progress to the team | approved | Show testing work on a visible board, such as kanban, so progress and blockers can be s... |
-| TST-312 | code, site, explore | Preparing evidence or documentation for a regulated release | approved | In regulated work, set clear documentation paths that follow agile values, without extr... |
 | TST-401 | site | right after a deploy reaches the site | approved | Use read only checks to inspect live behaviour when live verification is needed. |
 | TST-402 | site | while a canary serves part of the live traffic | approved | While a canary runs, put its signals next to the control signals and judge the differen... |
 | TST-403 | site | before a canary is watched | approved | Before a canary is watched, pick the few metrics that most show user harm, such as fail... |

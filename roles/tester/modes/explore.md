@@ -8,10 +8,8 @@ then reads only (`TST-P03`).
 
 Before each step, run `cards.py tester explore <step>`.
 
-1. **Charter.** Start test thinking while a feature is still an idea, and
-   learn its purpose first (`TST-304`, `TST-303`). Write 1 charter per
-   session: the area and what to look for (`TST-212`); personas and tours give
-   ideas (`TST-307`); track coverage on a mind map or matrix (`TST-302`). Time box it when running session based testing (`TST-213`).
+1. **Charter.** Write 1 charter per session: the area and what to look for
+   (`TST-212`). Time box it when running session based testing (`TST-213`).
    Give each charter its own account and session (`TST-014`).
 2. **Explore** the working product (`TST-203`). Take notes as you go, so each
    problem can be reproduced (`TST-214`). AI features: test retrieved content,

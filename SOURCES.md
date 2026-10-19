@@ -24,7 +24,8 @@ each card.
   Addison Wesley, 2015). This is a third party summary, not the book; cards
   cite it as such. The book:
   https://www.pearson.com/store/en-gb/p/more-agile-testing-learning-journeys-for-the-whole-team/P200000009372/9780321967053
-  Cards TST-301 to TST-312.
+  Cards TST-301 to TST-312 were dropped on 2026-10-19, because a summary is
+  not a primary source. Git history keeps them.
 - *More Agile Testing*, Janet Gregory and Lisa Crispin, Addison Wesley, 2015,
   chapter 23 "Testing and DevOps": the publisher's free sample chapter (the
   real book text, printed pages 361 to 376), read 2026-10-14.
