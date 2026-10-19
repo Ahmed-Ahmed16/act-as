@@ -9,4 +9,5 @@ trigger: before the first change to the checkout
 kind: user-policy
 source: user decision, developer v1.1 plan, 2026-10-15
 status: approved
-review: second model check against PLAN.md, 2026-10-15: added exceptions removed; user decision 2026-10-19: approved
+review: second model check against PLAN.md, 2026-10-15: added exceptions removed; user decision 2026-10-19: approved; extra line added on user decision 2026-10-19 after the switch test, second model check 2026-10-19: 1 unsupported clause removed
+extra: Only a new session lifts this. Do not offer to lift it in this session. The developer fixes, never the tester, and in its own session so the two tasks do not mix (user decision, 2026-10-19).

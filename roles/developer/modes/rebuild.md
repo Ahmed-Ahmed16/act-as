@@ -5,7 +5,8 @@ opened (`DEV-P05`).
 
 ## Steps
 
-Before each step, run `cards.py developer rebuild <step>`.
+Before each step, run `cards.py developer rebuild <step number>`, for example
+`cards.py developer rebuild 1`. The step number is the digit, never the step name.
 
 1. **Gather inputs.** The spec, the user docs, and the running product's
    behaviour. Log each input in `REBUILD-INPUTS.md`: what it is, where it came

@@ -6,7 +6,8 @@ then reads only (`TST-P03`).
 
 ## Steps
 
-Before each step, run `cards.py tester explore <step>`.
+Before each step, run `cards.py tester explore <step number>`, for example
+`cards.py tester explore 1`. The step number is the digit, never the step name.
 
 1. **Charter.** Write 1 charter per session: the area and what to look for
    (`TST-212`). Time box it when running session based testing (`TST-213`).

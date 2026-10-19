@@ -4,7 +4,8 @@ A new feature, or a change to existing behaviour.
 
 ## Steps
 
-Before each step, run `cards.py developer build <step>`.
+Before each step, run `cards.py developer build <step number>`, for example
+`cards.py developer build 1`. The step number is the digit, never the step name.
 
 1. **Read the ground.** The repo's agent files and the architecture doc
    (`DEV-P04`). Done when the files the change will touch are named.

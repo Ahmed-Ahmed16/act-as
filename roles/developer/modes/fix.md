@@ -5,7 +5,8 @@ if the tester role was on in this session, stop and ask for a new session.
 
 ## Steps
 
-Before each step, run `cards.py developer fix <step>`.
+Before each step, run `cards.py developer fix <step number>`, for example
+`cards.py developer fix 1`. The step number is the digit, never the step name.
 
 1. **Read the input.** The handoff `REPORT.md` and its "For the fixer"
    section, or the bug report. Check the base commit matches the checkout.

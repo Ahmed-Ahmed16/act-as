@@ -36,8 +36,8 @@ What is done, what is next, and what is still untested. Updated 2026-10-19.
    scan the final commit again if anything merges after `42c662e`.
 2. **Developer role, v1.1: built, switch test passed.** `roles/developer/ROLE.md`,
    modes fix, build and rebuild, and 6 policy cards (DEV-P01 to DEV-P06),
-   approved by the user on 2026-10-19 after a second model check. Open: the
-   2 findings from the switch test (below), then source the mode cards.
+   approved by the user on 2026-10-19 after a second model check. The 2
+   switch test findings are fixed. Next: source the mode cards.
 3. **Manager role, v1.2.** A status page: done, open, top 3 risks, next 3
    steps, which role runs each. No code, no tests.
 4. **Security role**, later.
@@ -86,14 +86,18 @@ bug, 4 fresh sessions, judged by tool calls and git state. All 4 passed.
 - Harness: a global `~/.claude/skills/act-as` shadows a project copy, so the
   branch ran under the name `act-as-branch` (only its `name:` line changed).
 
-Findings, open:
+Findings:
 
-- `cards.py tester code setup` exits 2: mode files name steps by word,
-  `cards.py` takes the step number. Both sessions recovered.
-- Both developers offered the user to "lift DEV-P03 for this session". The
-  card has no such exception.
-- Tester sessions wrote to the user's work brain through a global
-  `CLAUDE.md` habit, outside the checkout.
+- Fixed 2026-10-19: mode files and `SKILL.md` named a `<step>`, and agents
+  passed the step name (`setup`); `cards.py` takes the number. Now they say
+  `<step number>` with an example.
+- Fixed 2026-10-19: both developers offered the user to "lift DEV-P03 for
+  this session". DEV-P03 now says only a new session lifts it and never to
+  offer that (user decision, rechecked by a second model).
+- Open, user side: tester sessions wrote to the user's work brain through a
+  global `CLAUDE.md` habit, outside the checkout.
+- Not yet rerun: a same session run to show the developer no longer offers
+  to lift DEV-P03.
 
 ## Untested cases
 
