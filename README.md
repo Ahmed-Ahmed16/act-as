@@ -11,7 +11,7 @@ with its source: a book page, a standard, or a web page with the date read.
 | Role | State |
 | --- | --- |
 | tester | v1 |
-| developer | planned |
+| developer | v1.1, not yet proven |
 | manager | planned |
 
 ## What the tester does

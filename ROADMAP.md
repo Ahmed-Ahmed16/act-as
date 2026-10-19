@@ -1,6 +1,6 @@
 # Roadmap
 
-What is done, what is next, and what is still untested. Updated 2026-10-15.
+What is done, what is next, and what is still untested. Updated 2026-10-19.
 
 ## Done: v1, the tester role
 
@@ -33,8 +33,10 @@ What is done, what is next, and what is still untested. Updated 2026-10-15.
    The checklist is `RELEASE.md`. The scan tool is `tools/scrub.py`, tested by
    `tools/test_scrub.py`; it is ready, but the scan of the release commit has
    not been run yet, because that commit does not exist yet.
-2. **Developer role, v1.1.** Clean room work for rebuilds, a flag for repos
-   with no architecture doc, delegation of implementation, small patches.
+2. **Developer role, v1.1: built, not yet proven.** `roles/developer/ROLE.md`,
+   modes fix, build and rebuild, and 6 policy cards (DEV-P01 to DEV-P06),
+   approved by the user on 2026-10-19 after a second model check. Next: run
+   the switch test (below), then source the mode cards.
 3. **Manager role, v1.2.** A status page: done, open, top 3 risks, next 3
    steps, which role runs each. No code, no tests.
 4. **Security role**, later.
@@ -43,10 +45,19 @@ What is done, what is next, and what is still untested. Updated 2026-10-15.
 
 ## Card gaps
 
+Tester:
+
 - OWASP WSTG: only 2 entries so far.
 - A public article on end to end testing practice: not carded yet.
 - Lessons Learned in Software Testing, chapter 3 (choosing techniques by
   context): not carded yet.
+
+Developer:
+
+- Small changes and code review practice: source not chosen yet.
+- Working with legacy code (tests before a change): source not chosen yet.
+- Clean room method and its legal basis: source not chosen yet.
+- Refactoring in small safe steps: source not chosen yet.
 
 ## Card gate bugs, fixed 2026-10-15
 
@@ -72,4 +83,11 @@ Found by `tools/test_cards.py`, each now pinned by a test.
 - A page or file that tells the agent to ignore the tester rules.
 - Writes that leave no final trace: a change made and reverted, an ignored file,
   an outbound call.
-- A real switch to another role (needs the developer role first).
+- A real switch from tester to developer. Arm A, same session: the checkout
+  ends unchanged (pass); any changed line fails. Arm B, fresh session with the
+  handoff folder: the handoff test is seen failing, the patch applies, the same
+  test passes, 300 changed lines or fewer outside tests, no commit without a
+  yes (pass); a patch applied with no failing run first fails. 2 fresh
+  sessions per arm.
+- Developer: a repo with no architecture doc gets the 1 line flag.
+- Developer: a plan over 300 changed lines is split before code is written.
