@@ -10,9 +10,9 @@ public. Each decision is the owner's; nothing here is chosen yet.
   `THIRD-PARTY-NOTICES.md`.
 - [x] **Short book quotes** in card `anchor` fields: keep, shorten, or drop.
   Decision: `keep`, 2026-10-15.
-- [ ] **Cards TST-301 to TST-312** cite a third party summary of
+- [x] **Cards TST-301 to TST-312** cite a third party summary of
   *More Agile Testing*, not the book (see `SOURCES.md`): keep or drop.
-  Decision: `___`.
+  Decision: `drop`, 2026-10-19.
 
 ## Scan of the exact commit
 

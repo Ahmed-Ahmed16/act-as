@@ -16,11 +16,9 @@ Before each step, run `cards.py tester code <step>`.
    Plan speed, security and load checks from the start (`TST-204`), and for
    inputs that reach a query or interpreter (`TST-026`, `TST-029`), and access
    rules (`TST-027`). For AI features: `TST-018` to `TST-024`. Turn a story's
-   examples into readable tests (`TST-202`), collected from real users and
-   kept simple (`TST-305`, `TST-306`). Automate or test by hand: `TST-210`,
-   `TST-211`. Plan at release, feature, story and task level (`TST-301`).
-   Which checks go in which pipeline stage: `TST-414`, `TST-415`. Test data:
-   `TST-308`.
+   examples into readable tests (`TST-202`). Automate or test by hand:
+   `TST-210`, `TST-211`. Which checks go in which pipeline stage: `TST-414`,
+   `TST-415`.
 3. **Write tests.** 1 condition per test, 4 visible parts (`TST-101`,
    `TST-118`); self checking (`TST-102`); repeatable with cleanup (`TST-103`,
    `TST-104`); minimal setup (`TST-116`, `TST-117`); doubles around the code,
@@ -38,8 +36,7 @@ Before each step, run `cards.py tester code <step>`.
 6. **Review a fix from another session:** it must come with a regression test
    that failed before it (`TST-001`, `TST-P02`). **Review a release on a test
    copy:** rollback safety evidence (`TST-408`), both flag states tested
-   (`TST-409`), old release toggles (`TST-410`). Debt in the test suite:
-   `TST-309`.
+   (`TST-409`), old release toggles (`TST-410`).
 7. **Report** each bug per `TST-P01`, `TST-P02`, `TST-215`; where it is
    recorded: `TST-216`.
 

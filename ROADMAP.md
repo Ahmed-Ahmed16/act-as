@@ -5,7 +5,7 @@ What is done, what is next, and what is still untested. Updated 2026-10-15.
 ## Done: v1, the tester role
 
 - `/act-as tester` with 3 modes: code, site, explore.
-- 126 approved cards. Each was drafted by 1 model and checked against its raw
+- 114 approved cards. Each was drafted by 1 model and checked against its raw
   source by a different model, with spot checks on top.
 - `tools/cards.py`: the card gate. It loads only approved cards whose mode fits
   the step. `cards.py tester --audit` shows 3 expected skips: TST-514 and
@@ -25,11 +25,11 @@ What is done, what is next, and what is still untested. Updated 2026-10-15.
 ## Next
 
 1. **Public release gate.** Each item needs a yes or a fix:
-   - a licence for this repo's own text (not chosen yet);
-   - the short book quotes in card `anchor` fields: keep, shorten, or drop;
-   - cards TST-301 to TST-312 cite a third party summary of a book: keep or
-     drop;
-   - a fresh scrub and token scan of the exact commit.
+   - licence: done, MIT (2026-10-15);
+   - the short book quotes in card `anchor` fields: done, kept (2026-10-15);
+   - cards TST-301 to TST-312, which cited a summary: done, dropped
+     (2026-10-19);
+   - a fresh scrub and token scan of the exact commit: open.
    The checklist is `RELEASE.md`. The scan tool is `tools/scrub.py`, tested by
    `tools/test_scrub.py`; it is ready, but the scan of the release commit has
    not been run yet, because that commit does not exist yet.
