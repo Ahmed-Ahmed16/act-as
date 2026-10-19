@@ -35,8 +35,9 @@ commit scan reads only the commit's own files.
 It does not know the names of people, machines or companies. Read the
 published files for those by hand.
 
-- [ ] Names checked by hand. Result: `___`.
+- [x] Names checked by hand. Result: `only the owner's name, in LICENSE`, 2026-10-19.
 
-- [ ] Commit scanned: `___`. Result: `___`.
-- [ ] `python -m unittest discover -s tools -p "test_*.py"` passes on that
+- [x] Commit scanned: `42c662e`. Result: `0 findings`, 2026-10-19. All 21
+  commits in the history also scanned: 0 findings.
+- [x] `python -m unittest discover -s tools -p "test_*.py"` passes on that
   commit.

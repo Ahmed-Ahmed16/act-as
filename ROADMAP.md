@@ -29,10 +29,11 @@ What is done, what is next, and what is still untested. Updated 2026-10-15.
    - the short book quotes in card `anchor` fields: done, kept (2026-10-15);
    - cards TST-301 to TST-312, which cited a summary: done, dropped
      (2026-10-19);
-   - a fresh scrub and token scan of the exact commit: open.
+   - a fresh scrub and token scan of the exact commit: done, commit
+     `42c662e`, 0 findings (2026-10-19).
    The checklist is `RELEASE.md`. The scan tool is `tools/scrub.py`, tested by
-   `tools/test_scrub.py`; it is ready, but the scan of the release commit has
-   not been run yet, because that commit does not exist yet.
+   `tools/test_scrub.py`. Every gate item is done. Before the repo goes public,
+   scan the final commit again if anything merges after `42c662e`.
 2. **Developer role, v1.1.** Clean room work for rebuilds, a flag for repos
    with no architecture doc, delegation of implementation, small patches.
 3. **Manager role, v1.2.** A status page: done, open, top 3 risks, next 3
