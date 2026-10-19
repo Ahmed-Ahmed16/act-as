@@ -7,7 +7,7 @@ example: "May I commit the 2 changed files on branch fix-login with the message 
 mode: all
 trigger: before any action outside the checkout
 kind: user-policy
-source: user decision, developer v1.1 plan, 2026-10-15 (pending card approval)
-status: draft
-review: second model check against PLAN.md, 2026-10-15: added exceptions removed; the user approves policy cards
+source: user decision, developer v1.1 plan, 2026-10-15
+status: approved
+review: second model check against PLAN.md, 2026-10-15: added exceptions removed; user decision 2026-10-19: approved
 extra: A no wins and lasts for the session until the user lifts it, as in TST-P03.

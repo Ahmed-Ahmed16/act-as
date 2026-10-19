@@ -15,7 +15,7 @@ or names another role.
 | Role | File | State |
 | --- | --- | --- |
 | tester | `roles/tester/ROLE.md` | v1 |
-| developer | `roles/developer/ROLE.md` | v1.1 draft: off until its policy cards are approved |
+| developer | `roles/developer/ROLE.md` | v1.1, not yet proven |
 | manager | `roles/manager/ROLE.md` | planned |
 
 ## Steps
@@ -50,8 +50,9 @@ disagree on local detail (naming, layout, commands), the repo wins.
 A card is 1 rule with its source. Cards live in `roles/<role>/cards/`, and
 load only through `python <skill dir>/tools/cards.py <role> <mode> <step>`.
 Run it before each step. Run `... <role> <mode> policy` at the start.
-Exit 3 means stop, as in step 2. For each printed card, say in 1 line whether
-its trigger fits the task now. Use only those that fit. Cite each by id.
+At the policy step, any exit other than 0 means stop, as in step 2. For each
+printed card, say in 1 line whether its trigger fits the task now. Use only
+those that fit. Cite each by id.
 If Python is missing, open the step's cards by hand and say so. Check status
 and mode yourself. A policy card that fails the gate still means stop.
 

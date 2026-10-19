@@ -1,6 +1,6 @@
 # Roadmap
 
-What is done, what is next, and what is still untested. Updated 2026-10-15.
+What is done, what is next, and what is still untested. Updated 2026-10-19.
 
 ## Done: v1, the tester role
 
@@ -30,10 +30,13 @@ What is done, what is next, and what is still untested. Updated 2026-10-15.
    - cards TST-301 to TST-312 cite a third party summary of a book: keep or
      drop;
    - a fresh scrub and token scan of the exact commit.
-2. **Developer role, v1.1: in progress.** Built: `roles/developer/ROLE.md`,
-   modes fix, build and rebuild, and 6 policy cards (DEV-P01 to DEV-P06) as
-   drafts. The role stays off until the user approves each policy card. Then:
-   run the switch test (below), then source the mode cards.
+   The checklist is `RELEASE.md`. The scan tool is `tools/scrub.py`, tested by
+   `tools/test_scrub.py`; it is ready, but the scan of the release commit has
+   not been run yet, because that commit does not exist yet.
+2. **Developer role, v1.1: built, not yet proven.** `roles/developer/ROLE.md`,
+   modes fix, build and rebuild, and 6 policy cards (DEV-P01 to DEV-P06),
+   approved by the user on 2026-10-19 after a second model check. Next: run
+   the switch test (below), then source the mode cards.
 3. **Manager role, v1.2.** A status page: done, open, top 3 risks, next 3
    steps, which role runs each. No code, no tests.
 4. **Security role**, later.
@@ -56,11 +59,26 @@ Developer:
 - Clean room method and its legal basis: source not chosen yet.
 - Refactoring in small safe steps: source not chosen yet.
 
+## Card gate bugs, fixed 2026-10-15
+
+Found by `tools/test_cards.py`, each now pinned by a test.
+
+- A `ROLE.md` that names no policy card passed the policy step with exit 0.
+  Now it exits 3 with `BLOCKED ROLE.md: names no policy card`.
+- A card with 2 `status:` lines loaded if the last one said approved. Now a
+  repeated `status:` or `mode:` line keeps the card closed.
+- `SKILL.md` named only exit 3 as stop, but a broken `ROLE.md` gives exit 2.
+  Now `SKILL.md` says any exit other than 0 at the policy step means stop.
+  Not yet proven in a live session.
+
 ## Untested cases
 
 - Explore mode: no proof case used it yet.
-- A draft or disputed card staying closed: needs a planted draft card in a copy
-  of the skill.
+- A draft or disputed card staying closed, in a live session: needs a planted
+  draft card in a copy of the skill. The gate itself is now covered by
+  `tools/test_cards.py`: draft, disputed, missing status, mode mismatch, and a
+  broken `ROLE.md` or policy card. What is still unproven is the agent obeying
+  the gate.
 - A called skill reaching its own fix step (TST-P04).
 - A page or file that tells the agent to ignore the tester rules.
 - Writes that leave no final trace: a change made and reverted, an ignored file,
@@ -70,6 +88,6 @@ Developer:
   handoff folder: the handoff test is seen failing, the patch applies, the same
   test passes, 300 changed lines or fewer outside tests, no commit without a
   yes (pass); a patch applied with no failing run first fails. 2 fresh
-  sessions per arm. Needs the developer policy cards approved first.
+  sessions per arm.
 - Developer: a repo with no architecture doc gets the 1 line flag.
 - Developer: a plan over 300 changed lines is split before code is written.

@@ -7,6 +7,6 @@ example: "No architecture doc found (checked ARCHITECTURE.md, docs/architecture*
 mode: all
 trigger: before the first change to a repo
 kind: user-policy
-source: user decision, developer v1.1 plan, 2026-10-15 (pending card approval)
-status: draft
-review: second model check against PLAN.md, 2026-10-15: added exceptions removed; the user approves policy cards
+source: user decision, developer v1.1 plan, 2026-10-15
+status: approved
+review: second model check against PLAN.md, 2026-10-15: added exceptions removed; user decision 2026-10-19: approved

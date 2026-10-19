@@ -7,6 +7,6 @@ example: A feature plan shows 450 changed lines. It becomes patch 1, the data mo
 mode: all
 trigger: before writing code, and before handing back a diff
 kind: user-policy
-source: user decision, developer v1.1 plan, 2026-10-15 (pending card approval)
-status: draft
-review: second model check against PLAN.md, 2026-10-15: added exceptions removed; the user approves policy cards
+source: user decision, developer v1.1 plan, 2026-10-15
+status: approved
+review: second model check against PLAN.md, 2026-10-15: added exceptions removed; user decision 2026-10-19: approved

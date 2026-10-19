@@ -11,7 +11,7 @@ with its source: a book page, a standard, or a web page with the date read.
 | Role | State |
 | --- | --- |
 | tester | v1 |
-| developer | v1.1 draft |
+| developer | v1.1, not yet proven |
 | manager | planned |
 
 ## What the tester does
@@ -39,11 +39,26 @@ opens the cards by hand.
 - `roles/<role>/ROLE.md`: the role. `modes/`: 1 file per mode.
 - `roles/<role>/cards/`: the rules. `cards/INDEX.md` lists them.
 - `tools/cards.py`: the card gate. `tools/test_cards.py`: its tests.
+- `tools/scrub.py`: the secret and private data scan for a release.
+  `tools/test_scrub.py`: its tests.
+- `RELEASE.md`: the public release checklist.
 - `SOURCES.md`: every source behind the cards.
 - `THIRD-PARTY-NOTICES.md`: licences for copied material.
 
 ## Tests
 
 ```
-python -m unittest discover -s tools -p test_cards.py
+python -m unittest discover -s tools -p "test_*.py"
 ```
+
+## Licence
+
+This repo's own text and code are released under the MIT licence. You may
+use, copy, change, and share them, as long as you keep the copyright notice.
+The full text is in `LICENSE`.
+
+Some files are not covered by this licence:
+
+- `roles/tester/borrowed/pstack/` stays under its own MIT licence.
+- Short quotes from books in card `anchor` fields belong to their authors.
+- See `THIRD-PARTY-NOTICES.md` for details.
