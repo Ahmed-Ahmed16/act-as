@@ -12,7 +12,7 @@ with its source: a book page, a standard, or a web page with the date read.
 | --- | --- |
 | tester | v1 |
 | developer | v1.1, not yet proven |
-| manager | planned |
+| manager | v1.2, not yet proven |
 
 ## What the tester does
 
