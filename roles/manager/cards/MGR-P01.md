@@ -9,4 +9,4 @@ trigger: before any tool call that writes
 kind: user-policy
 source: user decision, manager v1.2 plan, 2026-10-19
 status: approved
-review: user agreed the rules 2026-10-19 (plan decision 3); claude-sonnet-5-5 2026-10-19 CHANGE: flagged "or plan"; kept, because the user approved plan mode (decision 2); user approval 2026-10-20: approved; script line added after the manager test 2026-10-20 (user yes); claude-sonnet-5-5 2026-10-20 CHANGE: "or tool" dropped; user re-approval ___
+review: user agreed the rules 2026-10-19 (plan decision 3); claude-sonnet-5-5 2026-10-19 CHANGE: flagged "or plan"; kept, because the user approved plan mode (decision 2); user approval 2026-10-20: approved; script line added after the manager test 2026-10-20 (user yes); claude-sonnet-5-5 2026-10-20 CHANGE: "or tool" dropped; user re-approval 2026-10-20: approved
