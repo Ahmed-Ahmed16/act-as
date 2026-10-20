@@ -91,8 +91,9 @@ cites a book or web page yet; the gaps are in `ROADMAP.md`.
 ## Manager
 
 Cards MGR-P01 to MGR-P05 are user decisions from the manager v1.2 plan,
-2026-10-19, still draft. Cards MGR-001 to MGR-006, all draft, each checked
-against its raw source by a second model:
+2026-10-19, approved by the user on 2026-10-20. Cards MGR-001 to MGR-006,
+each checked against its raw source by a second model, approved by the user
+on 2026-10-20:
 
 - GOV.UK Service Manual, "Governance principles for agile service delivery",
   last updated 23 May 2016, read 2026-10-19.

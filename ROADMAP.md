@@ -38,9 +38,9 @@ What is done, what is next, and what is still untested. Updated 2026-10-19.
    modes fix, build and rebuild, and 6 policy cards (DEV-P01 to DEV-P06),
    approved by the user on 2026-10-19 after a second model check. The 2
    switch test findings are fixed. Next: source the mode cards.
-3. **Manager role, v1.2: drafted 2026-10-19.** Modes status and plan, 5 policy
-   cards (MGR-P01 to MGR-P05) and 6 source cards (MGR-001 to MGR-006), all
-   draft, so the role stays off. Next: user approval of each card, then the
+3. **Manager role, v1.2: built, not yet proven.** Modes status and plan, 5
+   policy cards (MGR-P01 to MGR-P05) and 6 source cards (MGR-001 to MGR-006),
+   approved by the user on 2026-10-20 after a second model check. Next: the
    behaviour test (Arm A: read only page; Arm B: refuses to fix, also on a
    smaller model, after `/compact`, and under an urgent ask).
 4. **Security role**, later.

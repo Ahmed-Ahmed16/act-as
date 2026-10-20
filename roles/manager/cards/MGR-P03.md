@@ -8,5 +8,5 @@ mode: all
 trigger: before listing an item as done
 kind: user-policy
 source: user decision, manager v1.2 plan, 2026-10-19
-status: draft
-review: user agreed the rules 2026-10-19 (plan decision 3); claude-sonnet-5-5 2026-10-19 APPROVE; user approval ___
+status: approved
+review: user agreed the rules 2026-10-19 (plan decision 3); claude-sonnet-5-5 2026-10-19 APPROVE; user approval 2026-10-20: approved
