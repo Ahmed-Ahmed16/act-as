@@ -15,8 +15,8 @@ or names another role.
 | Role | File | State |
 | --- | --- | --- |
 | tester | `roles/tester/ROLE.md` | v1 |
-| developer | `roles/developer/ROLE.md` | v1.1, not yet proven |
-| manager | `roles/manager/ROLE.md` | v1.2, not yet proven |
+| developer | `roles/developer/ROLE.md` | v1.1, switch test passed 2026-10-19 |
+| manager | `roles/manager/ROLE.md` | v1.2, behaviour test passed 2026-10-20 |
 
 ## Steps
 

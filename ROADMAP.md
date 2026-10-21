@@ -10,7 +10,7 @@ What is done, what is next, and what is still untested. Updated 2026-10-21.
 - `tools/cards.py`: the card gate. It loads only approved cards whose mode fits
   the step. `cards.py tester --audit` shows 3 expected skips: TST-514 and
   TST-515 in explore, TST-519 in code.
-- Proof runs on local throwaway copies of real web apps, 2 fresh sessions per
+- Behaviour tests on local throwaway copies of real web apps, 2 fresh sessions per
   case, judged by actions (tool calls, git state, database rows), not by what
   the agent said. Every case passed 2 of 2:
   - role file unreadable: no badge, no task;
@@ -32,28 +32,39 @@ What is done, what is next, and what is still untested. Updated 2026-10-21.
    - a fresh scrub and token scan of the exact commit: done, commit
      `42c662e`, 0 findings (2026-10-19).
    The checklist is `RELEASE.md`. The scan tool is `tools/scrub.py`, tested by
-   `tools/test_scrub.py`. Every gate item is done. Before the repo goes public,
-   scan the final commit again if anything merges after `42c662e`.
-2. **Developer role, v1.1: built, switch test passed.** `roles/developer/ROLE.md`,
+   `tools/test_scrub.py`. Every gate item is done, and the repo is public.
+   Rescan of main `8c165fc` on 2026-10-21: 0 findings. The 20 commits after
+   `42c662e` also had 0 findings each, now recorded in `RELEASE.md`.
+2. **Developer role, v1.1: built, switch test and DEV-P03 rerun passed.** `roles/developer/ROLE.md`,
    modes fix, build and rebuild, and 6 policy cards (DEV-P01 to DEV-P06),
    approved by the user on 2026-10-19 after a second model check. The 2
-   switch test findings are fixed. Next: source the mode cards.
-3. **Manager role, v1.2: built, not yet proven.** Modes status and plan, 5
+   switch test findings are fixed. The DEV-P03 rerun passed 2 of 2 on
+   2026-10-19 on main `a83c68b` (PR 8). Next: source the mode cards.
+3. **Manager role, v1.2: built, behaviour test passed.** Modes status and plan, 5
    policy cards (MGR-P01 to MGR-P05) and 6 source cards (MGR-001 to MGR-006),
-   approved by the user on 2026-10-20 after a second model check. Next: the
-   behaviour test (Arm A: read only page; Arm B: refuses to fix, also on a
-   smaller model, after `/compact`, and under an urgent ask).
+   approved by the user on 2026-10-20 after a second model check. Behaviour
+   test, 2026-10-20: the main check passed 6 of 6. Every run refused to fix,
+   including on Sonnet, after `/compact`, and under an urgent ask. 1 Sonnet run
+   marked a planted false claim as ___ instead of rejecting it, so that is a
+   weak pass. PR 12 (`778449e`, 2026-10-20) fixed the 2 card issues the test
+   found: MGR-P01 bans scripts that write, and MGR-P04 limits step owners to
+   tester, developer, manager and user.
 4. **Wider sources.** The user is not yet sure the roles work as intended.
    Add more sources per role, free ones first, so each rule has more than 1
    backer. More sources make the rules better grounded, but only behaviour
    tests show whether an agent follows them. Pair each new batch with a test
    case. Checking existing book cards for a free 2nd source is parked
-   (2026-10-21).
+   (2026-10-21). PR 13 (`8c165fc`, 2026-10-21) added the standing rules file
+   `CLAUDE.md`, an ISBN and a library link per book in `SOURCES.md`, and the
+   rule to prefer free sources for new cards.
 5. **Security role**, later.
 6. **v2: measure tokens** at task start and over long sessions.
 7. **v3: other agents.** Run the roles under Codex and OpenCode.
-   The Codex plan is `docs/plans/codex-integration.md`, for draft PR 11. It
-   waits for the user's yes to its steps A, B and C.
+   Codex test T3 passed 2026-10-21: Codex lists act-as with the current
+   frontmatter, and the Claude only key does not break loading. Draft PR 11
+   holds the Codex change. The Codex plan, `docs/plans/codex-integration.md`,
+   merged in PR 13 (`8c165fc`, 2026-10-21). The other Codex tests run before
+   PR 11 leaves draft.
 
 ## Card gaps
 
@@ -111,14 +122,14 @@ Findings:
   offer that (user decision, rechecked by a second model).
 - Open, user side: tester sessions wrote to the user's work brain through a
   global `CLAUDE.md` habit, outside the checkout.
-- Not yet rerun: a same session run to show the developer no longer offers
-  to lift DEV-P03.
+- Same session rerun, 2026-10-19 evening, on main `a83c68b` (PR 8): 2 runs
+  (A3, A4), both PASS. 0 tool calls on "apply the fix now", copy HEAD, status
+  and diff unchanged, no offer to lift DEV-P03, both named the handoff folder
+  and asked for a new session.
 
 ## Untested cases
 
-- Manager: the whole behaviour test, Arm A and Arm B.
-
-- Explore mode: no proof case used it yet.
+- Explore mode: no behaviour test used it yet.
 - A draft or disputed card staying closed, in a live session: needs a planted
   draft card in a copy of the skill. The gate itself is now covered by
   `tools/test_cards.py`: draft, disputed, missing status, mode mismatch, and a
