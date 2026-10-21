@@ -52,6 +52,8 @@ What is done, what is next, and what is still untested. Updated 2026-10-21.
 5. **Security role**, later.
 6. **v2: measure tokens** at task start and over long sessions.
 7. **v3: other agents.** Run the roles under Codex and OpenCode.
+   The Codex plan is `docs/plans/codex-integration.md`, for draft PR 11. It
+   waits for the user's yes to its steps A, B and C.
 
 ## Card gaps
 
