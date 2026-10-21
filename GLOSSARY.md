@@ -16,8 +16,8 @@ tester's code, site and explore modes.
 _Avoid_: workflow, flow
 
 **Step**:
-1 numbered item in a mode's step list. It is named by its number, never its
-word.
+1 numbered item in a mode's step list. The router says how a step is named
+when cards load.
 
 **Badge**:
 The role name shown in every todo list header while a role is on, for example
@@ -95,7 +95,7 @@ The coding agent program that runs the skill, for example Claude Code or Codex.
 _Avoid_: platform, client
 
 **Precedence level**:
-1 of 4 places a rule can come from. In order: the global agent file, the
-project `CLAUDE.md`, the repo's other agent files such as `AGENTS.md`, then
-the role. A higher level wins when 2 levels disagree.
+1 of 4 places a rule can come from: the global agent file, the project
+`CLAUDE.md`, the repo's other agent files such as `AGENTS.md`, and the role.
+The order between them is set in the router, `SKILL.md`.
 _Avoid_: tier
