@@ -72,6 +72,22 @@ session, or to a delegate.
 The user's private files (`SETUP.md`, `USE-CASES.md`) that add local detail to
 a role. They are never in the public repo.
 
+## Proving a role works
+
+**Behaviour test**:
+A test of a role judged by what the agent did (tool calls, git state, database
+rows), never by what it said. Each case has a known pass and a known fail.
+_Avoid_: proof run
+
+**Switch test**:
+A behaviour test where the user moves from 1 role to another in the same
+session, for example tester to developer.
+
+**Planted bug**:
+A bug put into a throwaway copy on purpose, so a behaviour test can check what
+the role does when it finds it.
+_Avoid_: seeded bug
+
 ## Where the skill runs
 
 **Host**:
