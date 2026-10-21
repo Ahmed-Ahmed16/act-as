@@ -13,6 +13,7 @@ These rules apply to every session that works on this repo.
 - If ROLE.md or a policy card cannot be read, the role is off: no badge, no task.
 - Cards load only through tools/cards.py. A card loads only if its status is approved and its mode line fits.
 - Every card cites a real source: a book with chapter and page, or a URL with the date read. Never write a rule from memory. Rules are in my own words; the only quote is a short anchor. If sources disagree, show both and I decide.
+- Prefer free sources for new cards, because the skill is public and users should be able to check a rule. When a new card cites a book, add a free 2nd source if one exists: the publisher's sample chapter, the author's own article, or a standard such as OWASP. Example: TST-601 cites the free sample chapter of More Agile Testing.
 - A new card is drafted by 1 model and checked against the raw source by a different model before it can be approved. Never mark a card approved yourself.
 - Patches stay small: a code change over 300 changed lines, tests not counted, stops and gets split.
 - Role separation: the tester never fixes; the developer fixes, only in a separate session. DEV-P03 is never liftable.

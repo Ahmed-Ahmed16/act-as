@@ -1,6 +1,6 @@
 # Roadmap
 
-What is done, what is next, and what is still untested. Updated 2026-10-19.
+What is done, what is next, and what is still untested. Updated 2026-10-21.
 
 ## Done: v1, the tester role
 
@@ -43,9 +43,15 @@ What is done, what is next, and what is still untested. Updated 2026-10-19.
    approved by the user on 2026-10-20 after a second model check. Next: the
    behaviour test (Arm A: read only page; Arm B: refuses to fix, also on a
    smaller model, after `/compact`, and under an urgent ask).
-4. **Security role**, later.
-5. **v2: measure tokens** at task start and over long sessions.
-6. **v3: other agents.** Run the roles under Codex and OpenCode.
+4. **Wider sources.** The user is not yet sure the roles work as intended.
+   Add more sources per role, free ones first, so each rule has more than 1
+   backer. More sources make the rules better grounded, but only behaviour
+   tests show whether an agent follows them. Pair each new batch with a test
+   case. Checking existing book cards for a free 2nd source is parked
+   (2026-10-21).
+5. **Security role**, later.
+6. **v2: measure tokens** at task start and over long sessions.
+7. **v3: other agents.** Run the roles under Codex and OpenCode.
 
 ## Card gaps
 
