@@ -43,8 +43,8 @@ or names another role.
 
 The user's instructions win, in this order: global `CLAUDE.md` (in Codex,
 `~/.codex/AGENTS.md`), project `CLAUDE.md`, the repo's own agent files
-(`AGENTS.md` and similar), then the
-role. A role adds rules. It never relaxes one. When a role rule and a repo rule
+(`AGENTS.md` and similar), then the role. Project `CLAUDE.md` wins over
+`AGENTS.md` when they disagree. A role adds rules. It never relaxes one. When a role rule and a repo rule
 disagree on local detail (naming, layout, commands), the repo wins.
 
 ## Cards

@@ -28,7 +28,7 @@ Claude Code ignores this folder. Codex reads it.
 
 B. Edit `SKILL.md` (router only, no role or card change), 3 small edits:
 - Usage line: `/act-as tester` in Claude Code, `$act-as tester` in Codex.
-- Precedence: global `CLAUDE.md` or `~/.codex/AGENTS.md`, then project `CLAUDE.md` or `AGENTS.md`, then the role. Same order, both tools named.
+- Precedence, 4 levels: global `CLAUDE.md` (in Codex, `~/.codex/AGENTS.md`), then project `CLAUDE.md`, then the repo's own agent files (`AGENTS.md` and similar), then the role. Project `CLAUDE.md` wins over `AGENTS.md` when they disagree. This keeps today's order; Codex only adds a name for the global file. User decision 2026-10-21.
 - Overlay: look in `~/.claude/act-as-local/`, and if absent `~/.agents/act-as-local/`.
 
 C. README: an install line for Codex: clone into `~/.agents/skills/act-as` (Windows: `%USERPROFILE%\.agents\skills\act-as`).
