@@ -11,8 +11,8 @@ with its source: a book page, a standard, or a web page with the date read.
 | Role | State |
 | --- | --- |
 | tester | v1 |
-| developer | v1.1, not yet proven |
-| manager | v1.2, not yet proven |
+| developer | v1.1, switch test passed 2026-10-19 |
+| manager | v1.2, refuses to fix 6 of 6 (2026-10-20); rerun after PR 12 pending |
 
 ## What the tester does
 
