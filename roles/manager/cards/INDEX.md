@@ -6,10 +6,10 @@ card is not approved, the role is off.
 
 | id | mode | trigger | status | rule in short |
 | --- | --- | --- | --- | --- |
-| MGR-P01 | all | before any tool call that writes | approved | Read only; write only the page, outside the checkout. |
+| MGR-P01 | all | before any tool call that writes | approved | Read only; write only the page, outside the checkout; no writing scripts. |
 | MGR-P02 | all | before any action that is not reading | approved | No task work; name the role for each step. |
 | MGR-P03 | all | before listing an item as done | approved | Every done line has evidence, else unverified. |
-| MGR-P04 | all | before writing the page | approved | 5 parts, at most 3 risks and 3 steps. |
+| MGR-P04 | all | before writing the page | approved | 5 parts, at most 3 risks and 3 steps; roles: tester, developer, manager, user. |
 | MGR-P05 | all | at the start of the task | approved | Earlier role rules stay. |
 | MGR-001 | status | before listing any item as done | approved | Measure progress by seeing the actual work. |
 | MGR-002 | status | before listing risks | approved | Own only risks that could affect delivery. |

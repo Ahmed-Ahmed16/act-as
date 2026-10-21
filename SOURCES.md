@@ -2,7 +2,9 @@
 
 Every card cites 1 of these. Books are named, never copied or linked to a
 copy; cards paraphrase them with chapter and page numbers. Read dates are on
-each card.
+each card. Each book lists its ISBN and a link to its library catalogue record,
+not to a copy, so you can find the same edition and check the cited page. The
+catalogue links were added on 2026-10-21 without being opened.
 
 ## Tester
 
@@ -10,20 +12,24 @@ each card.
 
 - *xUnit Test Patterns: Refactoring Test Code*, Gerard Meszaros, Addison
   Wesley, 2007. https://www.informit.com/store/xunit-test-patterns-refactoring-test-code-9780131495050
+  ISBN 9780131495050. Library record: https://openlibrary.org/isbn/9780131495050
   Cards TST-101 to TST-118.
 - *Agile Testing: A Practical Guide for Testers and Agile Teams*, Lisa Crispin
   and Janet Gregory, Addison Wesley, 2009.
   https://www.pearson.com/store/en-us/p/agile-testing-a-practical-guide-for-testers-and-agile-teams/P200000009376/9780321534460
+  ISBN 9780321534460. Library record: https://openlibrary.org/isbn/9780321534460
   Cards TST-201 to TST-217.
 
 - *Lessons Learned in Software Testing: A Context Driven Approach*, Cem
   Kaner, James Bach and Bret Pettichord, Wiley, 2002.
   https://www.wiley.com/en-us/Lessons+Learned+in+Software+Testing%3A+A+Context-Driven+Approach-p-9780471081128
+  ISBN 9780471081128. Library record: https://openlibrary.org/isbn/9780471081128
   Cards TST-501 to TST-519 (TST-516 dropped as a duplicate).
 - A Bookey summary of *More Agile Testing* (Janet Gregory and Lisa Crispin,
   Addison Wesley, 2015). This is a third party summary, not the book; cards
   cite it as such. The book:
   https://www.pearson.com/store/en-gb/p/more-agile-testing-learning-journeys-for-the-whole-team/P200000009372/9780321967053
+  ISBN 9780321967053. Library record: https://openlibrary.org/isbn/9780321967053
   Cards TST-301 to TST-312 were dropped on 2026-10-19, because a summary is
   not a primary source. Git history keeps them.
 - *More Agile Testing*, Janet Gregory and Lisa Crispin, Addison Wesley, 2015,
@@ -100,7 +106,12 @@ on 2026-10-20:
   https://www.gov.uk/service-manual/governance/governance-principles .
   Cards MGR-001, MGR-002.
 - Frederick P. Brooks, The Mythical Man-Month, Anniversary Edition,
-  Addison-Wesley 1995. Cards MGR-003, MGR-004.
+  Addison-Wesley 1995. ISBN 9780201835953.
+  Library record: https://openlibrary.org/isbn/9780201835953
+  Cards MGR-003, MGR-004.
 - Tom DeMarco and Timothy Lister, Waltzing with Bears, Dorset House 2003.
+  ISBN 9780932633606. Library record: https://openlibrary.org/isbn/9780932633606
   Card MGR-005.
-- Scott Berkun, Making Things Happen, O'Reilly 2008. Card MGR-006.
+- Scott Berkun, Making Things Happen, O'Reilly 2008. ISBN 9780596517717.
+  Library record: https://openlibrary.org/isbn/9780596517717
+  Card MGR-006.
