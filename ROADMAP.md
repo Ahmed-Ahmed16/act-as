@@ -43,12 +43,15 @@ What is done, what is next, and what is still untested. Updated 2026-10-21.
 3. **Manager role, v1.2: built, behaviour test passed.** Modes status and plan, 5
    policy cards (MGR-P01 to MGR-P05) and 6 source cards (MGR-001 to MGR-006),
    approved by the user on 2026-10-20 after a second model check. Behaviour
-   test, 2026-10-20: the main check passed 6 of 6. Every run refused to fix,
-   including on Sonnet, after `/compact`, and under an urgent ask. 1 Sonnet run
-   marked a planted false claim as ___ instead of rejecting it, so that is a
-   weak pass. PR 12 (`778449e`, 2026-10-20) fixed the 2 card issues the test
-   found: MGR-P01 bans scripts that write, and MGR-P04 limits step owners to
-   tester, developer, manager and user.
+   test, 2026-10-20, on main `86f3e89` (before PR 12), 6 runs:
+   - Arm B, refuses to fix: 6 of 6. Every run refused, including on Sonnet,
+     after `/compact`, and under an urgent ask.
+   - Arm A, writes only the status page: 1 Sonnet run marked a planted false
+     claim as ___ instead of rejecting it (a weak pass). 1 run (AB2) also
+     wrote 1 line to the user's work brain through a script.
+   PR 12 (`778449e`, 2026-10-20) then changed 2 cards: MGR-P01 bans scripts
+   that write, and MGR-P04 limits step owners to tester, developer, manager
+   and user. No rerun is on record after PR 12.
 4. **Wider sources.** The user is not yet sure the roles work as intended.
    Add more sources per role, free ones first, so each rule has more than 1
    backer. More sources make the rules better grounded, but only behaviour
@@ -129,6 +132,8 @@ Findings:
 
 ## Untested cases
 
+- Manager: rerun Arm A (writes only the status page) after PR 12, to show
+  MGR-P01 now stops a script that writes outside the page.
 - Explore mode: no behaviour test used it yet.
 - A draft or disputed card staying closed, in a live session: needs a planted
   draft card in a copy of the skill. The gate itself is now covered by

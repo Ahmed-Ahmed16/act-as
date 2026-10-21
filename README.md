@@ -12,7 +12,7 @@ with its source: a book page, a standard, or a web page with the date read.
 | --- | --- |
 | tester | v1 |
 | developer | v1.1, switch test passed 2026-10-19 |
-| manager | v1.2, behaviour test passed 2026-10-20 |
+| manager | v1.2, refuses to fix 6 of 6 (2026-10-20); rerun after PR 12 pending |
 
 ## What the tester does
 
