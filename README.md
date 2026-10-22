@@ -12,7 +12,7 @@ with its source: a book page, a standard, or a web page with the date read.
 | --- | --- |
 | tester | v1 |
 | developer | v1.1, switch test passed 2026-10-19 |
-| manager | v1.2, refuses to fix 6 of 6 (2026-10-20); rerun after PR 12 pending |
+| manager | v1.2, refuses to fix 6 of 6 (2026-10-20); status page 4 of 4 after PR 12 (2026-10-22) |
 
 ## What the tester does
 
@@ -30,12 +30,22 @@ Clone this repo into your Claude Code skills folder:
 git clone <repo url> ~/.claude/skills/act-as
 ```
 
+For OpenAI Codex (CLI or IDE extension), clone it into the Codex user
+skills folder and call it with `$act-as tester`:
+
+```
+git clone <repo url> ~/.agents/skills/act-as
+```
+
+`agents/openai.yaml` stops Codex from loading the skill on its own.
+
 Python 3.8 or newer is needed for `tools/cards.py`. Without it, the agent
 opens the cards by hand.
 
 ## Layout
 
 - `SKILL.md`: the router and the loading rules.
+- `agents/openai.yaml`: Codex settings (explicit call only).
 - `roles/<role>/ROLE.md`: the role. `modes/`: 1 file per mode.
 - `roles/<role>/cards/`: the rules. `cards/INDEX.md` lists them.
 - `tools/cards.py`: the card gate. `tools/test_cards.py`: its tests.
