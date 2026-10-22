@@ -41,3 +41,6 @@ published files for those by hand.
   commits in the history also scanned: 0 findings.
 - [x] `python -m unittest discover -s tools -p "test_*.py"` passes on that
   commit.
+- [x] Rescan after later merges: commit `8c165fc` (main after PR 13). Result:
+  `0 findings`, 2026-10-21. The 20 commits after `42c662e` also scanned: 0
+  findings each. `tools/test_scrub.py` passed first (5 tests).
