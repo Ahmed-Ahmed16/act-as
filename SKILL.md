@@ -30,12 +30,20 @@ or names another role.
    on.** Show no badge, say which file failed, and run no task until it loads.
    This holds for every later turn. A missing overlay, skill or tool is softer:
    name it in 1 line, carry on without it, and never report it as having run.
-3. **Wear the badge.** Every todo list header shows the role, for example
-   `**Todo (tester)**`. Done when the next reply carries it.
+3. **Wear the badge only while the role is on.** The role turns on when
+   `ROLE.md` and the mode file for this task are read, and the policy check
+   passes: the policy gate exits 0 (see Cards), or, without Python, every
+   policy card checks out by hand. Read the overlay files that exist first.
+   Until the role is on, and while you ask the user which mode fits, a todo
+   list header carries no role: `**Todo**`. While the role is on, every todo
+   list header shows it, for example `**Todo (tester)**`. A role that names no
+   policy card never turns on. Done when the first reply after the policy
+   check carries the badge.
 4. **Follow the role file** for each task: its mode picker, its cards, its
    finish checklist.
 5. **On `stop acting`:** drop the badge and the role's rules from the next task
-   on. On a new role name: go back to step 1. Rules the old role set for this
+   on. On a new role name: go back to step 1. Drop the old badge at once; the
+   new one waits for step 3. Rules the old role set for this
    session stay (for example, the tester's no fix rule outlives a switch).
 
 ## Precedence
