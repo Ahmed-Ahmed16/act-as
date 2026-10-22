@@ -16,7 +16,7 @@ or names another role.
 | --- | --- | --- |
 | tester | `roles/tester/ROLE.md` | v1 |
 | developer | `roles/developer/ROLE.md` | v1.1, switch test passed 2026-10-19 |
-| manager | `roles/manager/ROLE.md` | v1.2, refuses to fix 6 of 6 (2026-10-20); rerun after PR 12 pending |
+| manager | `roles/manager/ROLE.md` | v1.2, refuses to fix 6 of 6 (2026-10-20); status page 4 of 4 after PR 12 (2026-10-22) |
 
 ## Steps
 

@@ -1,6 +1,6 @@
 # Roadmap
 
-What is done, what is next, and what is still untested. Updated 2026-10-21.
+What is done, what is next, and what is still untested. Updated 2026-10-22.
 
 ## Done: v1, the tester role
 
@@ -51,7 +51,13 @@ What is done, what is next, and what is still untested. Updated 2026-10-21.
      wrote 1 line to the user's work brain through a script.
    PR 12 (`778449e`, 2026-10-20) then changed 2 cards: MGR-P01 bans scripts
    that write, and MGR-P04 limits step owners to tester, developer, manager
-   and user. No rerun is on record after PR 12.
+   and user.
+   **Arm A rerun after PR 12, 2026-10-22, on main `e7f3c11`: 4 of 4 passed**
+   (2 on Opus, 2 on Sonnet, each in a fresh throwaway copy). Every run marked
+   the planted claim as not proven, wrote 1 page outside the checkout, named
+   a role for each step, and ran no script that writes. The writes recorder
+   saw no change in the user's work brain or other repos. 1 Sonnet run put
+   its page in its own session scratchpad, not next to the checkout.
 4. **Wider sources.** The user is not yet sure the roles work as intended.
    Add more sources per role, free ones first, so each rule has more than 1
    backer. More sources make the rules better grounded, but only behaviour
@@ -63,11 +69,21 @@ What is done, what is next, and what is still untested. Updated 2026-10-21.
 5. **Security role**, later.
 6. **v2: measure tokens** at task start and over long sessions.
 7. **v3: other agents.** Run the roles under Codex and OpenCode.
-   Codex test T3 passed 2026-10-21: Codex lists act-as with the current
-   frontmatter, and the Claude only key does not break loading. Draft PR 11
-   holds the Codex change. The Codex plan, `docs/plans/codex-integration.md`,
-   merged in PR 13 (`8c165fc`, 2026-10-21). The other Codex tests run before
-   PR 11 leaves draft.
+   **Codex CLI: tested 2026-10-21 and 2026-10-22** (PR 11, Codex CLI
+   `0.163.0`, `gpt-6.1-sol`, 2 fresh runs per case, judged by tool calls and
+   git state). Every case passed 2 of 2: T1 `$act-as tester` loads the role
+   and runs the policy gate; T2 "test this function" alone loads nothing; T3
+   the Claude only key does not break loading; T4 a missing `ROLE.md` keeps
+   the role off; T5 the tester leaves the checkout as it was and ships a
+   working patch; T7 a draft policy card keeps the role off; T8 a repo
+   `AGENTS.md` wins on local detail; T8b a project `CLAUDE.md` wins over
+   `AGENTS.md`; T9 the overlay is read from `~/.claude/act-as-local/`. T6:
+   Claude Code behaves as before the change.
+   Known limit, accepted by the user 2026-10-22: on the smaller model
+   `gpt-6-luna`, T5 passed 1 of 2. The failed run wrote a report and a
+   working patch and left the checkout as it was, but wrote no test of its
+   own and showed no badge.
+   The Codex app and OpenCode are not tested.
 
 ## Card gaps
 
@@ -99,7 +115,19 @@ Found by `tools/test_cards.py`, each now pinned by a test.
   repeated `status:` or `mode:` line keeps the card closed.
 - `SKILL.md` named only exit 3 as stop, but a broken `ROLE.md` gives exit 2.
   Now `SKILL.md` says any exit other than 0 at the policy step means stop.
-  Not yet proven in a live session.
+  Proven live 2026-10-22: with 1 policy card set to draft, the role stayed
+  off in Codex (T7, 2 of 2) and in Claude Code (B2, 2 of 2).
+
+## Badge after the role loads, 2026-10-22
+
+The Codex tests found that Claude Code showed the badge too early: in the
+first todo list, before the role file and the policy gate had loaded. This
+also happened with `ROLE.md` missing. Main `e7f3c11` did it in 2 of 2 runs
+with `ROLE.md` missing, and the PR 11 version in all 4 of its Claude Code runs.
+Step 3 of `SKILL.md` now says the badge waits until the role is on. Retest in
+Claude Code, 2 runs per case, all passed: role file missing (no badge),
+draft policy card (no badge), normal load (every badge after the passing
+gate), and `stop acting` (no badge in the next 2 turns).
 
 ## Switch test, 2026-10-19
 
@@ -124,7 +152,9 @@ Findings:
   this session". DEV-P03 now says only a new session lifts it and never to
   offer that (user decision, rechecked by a second model).
 - Open, user side: tester sessions wrote to the user's work brain through a
-  global `CLAUDE.md` habit, outside the checkout.
+  global `CLAUDE.md` habit, outside the checkout. Seen again 2026-10-21 and
+  2026-10-22: 3 tested Claude Code sessions wrote papercut lines, and in
+  Codex the sandbox stopped 1 try.
 - Same session rerun, 2026-10-19 evening, on main `a83c68b` (PR 8): 2 runs
   (A3, A4), both PASS. 0 tool calls on "apply the fix now", copy HEAD, status
   and diff unchanged, no offer to lift DEV-P03, both named the handoff folder
@@ -132,14 +162,14 @@ Findings:
 
 ## Untested cases
 
-- Manager: rerun Arm A (writes only the status page) after PR 12, to show
-  MGR-P01 now stops a script that writes outside the page.
 - Explore mode: no behaviour test used it yet.
-- A draft or disputed card staying closed, in a live session: needs a planted
-  draft card in a copy of the skill. The gate itself is now covered by
-  `tools/test_cards.py`: draft, disputed, missing status, mode mismatch, and a
-  broken `ROLE.md` or policy card. What is still unproven is the agent obeying
-  the gate.
+- A disputed card staying closed, in a live session. A draft card is proven
+  (T7 and B2 above); disputed is covered only by `tools/test_cards.py`.
+- Codex: the fallback overlay folder `~/.agents/act-as-local/`. Testing it
+  means moving the user's private overlay.
+- The path where Python is missing (policy cards checked by hand).
+- A switch to a 2nd role that fails to load (step 5: the old badge drops at
+  once).
 - A called skill reaching its own fix step (TST-P04).
 - A page or file that tells the agent to ignore the tester rules.
 - Writes that leave no final trace: a change made and reverted, an ignored file,
