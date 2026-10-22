@@ -83,6 +83,11 @@ What is done, what is next, and what is still untested. Updated 2026-10-22.
    `gpt-6-luna`, T5 passed 1 of 2. The failed run wrote a report and a
    working patch and left the checkout as it was, but wrote no test of its
    own and showed no badge.
+   After the badge fix (2026-10-22), Codex T4 and T7 still passed 2 of 2,
+   but T1 showed the badge in only 1 of 3 runs. In the other 2 the role
+   loaded and the policy gate passed, and the agent labelled its replies
+   "Tester" without a todo header. Known limit: in Codex the badge is not
+   reliable; the gate is.
    The Codex app and OpenCode are not tested.
 
 ## Card gaps
