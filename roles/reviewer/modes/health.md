@@ -193,8 +193,42 @@ Before each step, run `cards.py reviewer health <step number>`, for example
     the tests picked: say "covers N picked tests" and never "the tests are good".
     The command, the fault and the result stay in `independent-check.json`,
     apart from the CI evidence; Known risks names that file.
-16. **Translation checks.** Not written here. Ticket 38 fills this step. Until
-    it does, write `T1 to T8: not checked: translation checks not built yet`.
+16. **Translation checks (T1 to T8, G4).** Run
+    `python tools/translation_health.py --repo <copy of head> --base-lang <lang folder at the comparison base> --changed-files <files.json>`
+    and save its output in `runs/`. It reads files only. No changed language
+    file: write "no translation files changed" and stop. Every item below
+    is a finding or a pointer. None is ever `must fix`, and none fails health,
+    even when a missing key is confirmed in the code.
+    Findings (open the code and confirm each before you write it):
+    - T1 key in one language, not another: `check1`. A gap the PR did not
+      touch is still a finding; show `touched_by_pr` as data. An unreadable
+      file is `not checked: <file> unreadable`, never clean.
+    - T2 key used in code but missing from a language: `check2`. Also run
+      `php artisan translator:missing` in the container (network off). Never
+      run `translator:translate` or `translator:proofread`: they call an AI
+      service. The tool is proved offline for PHP group files only; for JSON
+      keys the script alone answers. If the 2 disagree, read the code.
+    - T3 named placeholder missing in one language: `check3` (`:count` skipped).
+    - T4 wrong number of plural forms, only for `trans_choice` keys: `check4`
+      gives the count per language. Compare it with the translation card on
+      Unicode CLDR plural rules. The script never judges a count. No card
+      loaded: `not checked: no plural card`.
+    Pointers (never a fail):
+    - T5 changed old values: `check5`. List them first in "Translations by
+      page", on their own, before any group.
+    - T6 keys with no use found: `check6`, split into "passed through a
+      variable" and "no trace". Also run `php artisan translator:dead` the same
+      way. A call site in `dynamic_call_sites` is `not checked`.
+    - T7 raw output `{!! __() !!}`: `check7`. Read each one; `args_escaped:
+      false` means an inserted value is not escaped. Say which value.
+    - T8 value with no letters of its language: `check8`. A locale in
+      `locales_not_checked_for_letters` is `not checked`, never a pass.
+    - G4 user visible text typed as a literal: `g4_literal_text`. Open each
+      `path:line` and read it. Text in logs, comments and tests does not count.
+    Packet: put "Translations by page" in Behaviour changed (changed old
+    values first, then `by_page`: each page, then "shared", then "no use
+    found"). Findings go to Known risks, pointers to Pointers. A key passed
+    through a variable is "not checked". Check record ids: T1 to T8, G4.
 17. **Pointers.** Every number from a tool or a guard is a pointer, including
     the 20 lines and complexity 10 of `clean-code-guard`. Each pointer gets 1
     line of judgement and a review question number. Example: "72 line method:
