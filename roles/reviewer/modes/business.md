@@ -142,6 +142,51 @@ Before each step, run `cards.py reviewer business <step number>`, for example
     the snapshot again and compare, as size mode step 7. Quote both snapshot
     paths and the result.
 
+### Rerun: "rerun business for <area>"
+
+The user names the exact packet path. A rerun writes into the same folder and
+the same `packet.md`. Only 1 writer at a time. Run no size, security or
+health step.
+
+These steps have their own numbers, 20 to 25, so `cards.py` can load them.
+Before each one, run `cards.py reviewer business <step number>`, for example
+`cards.py reviewer business 20`. No business card is approved yet, so these
+steps list none.
+
+20. **RR1. Check.** Run
+   `python tools/business_verdict.py rerun-check --packet <packet folder> --head <current PR head> [--drafts <drafts folder>]`.
+   Exit 1 with `refuse: PR head moved`: stop and ask for a new full run. Exit 3
+   (short packet, O19): stop and ask the user. Exit 0: it prints the base and
+   default commits from the identity line (`use base`, `use default`) and any
+   `page changed since the first run: <area>` lines. Copy those lines into
+   Not checked.
+21. **RR2. Read the same commits.** Use the base and default commits the tool
+   printed, never a newer default branch head. Run step 3 with them, with the
+   area's new page (a new draft in the drafts folder, or the page now on the
+   default branch commit named in the identity line; a page merged after the
+   first run is not on that commit, so use the draft).
+22. **RR3. Replace the area.** Redo steps 4 to 6 for that area only. Replace that
+   area's entries by their `area` field in every field of the packet, in
+   `check-record.json` and in `rules-pages.json`. Rewrite the draft message.
+   Remove the grill brief of that area when its page now exists.
+23. **RR4. Rebuild the verdict.** Update `runs/business-areas.json` with every
+   area the PR touches, the other areas as they were. Run the step 7 command.
+   Fixing 1 area must not pass business while another area is still
+   `grill needed`.
+24. **RR5. Security line rule.** If the rerun added a page that says who may do
+   what, run
+   `python tools/business_verdict.py security-line --line "<current security line>" --area <area>`
+   and use its output as the security line. A security `pass` becomes
+   `incomplete` with `merge only after: rerun security for <area>`. An
+   `incomplete` keeps its reason and gains that reason. A `fail` stays `fail`
+   and gains `also: rerun security for <area>`. A line that says `not asked` or
+   `not checked` stays as it is. Whether a page "says who may do what" is a
+   reading call (open question O10): state your reason in 1 line.
+25. **RR6. Add the rerun line.** Under the verdict lines add
+   `business rerun for <area>, <YYYY-MM-DD>, head <full head sha>`. Run the
+   packet check again (step 9) and show the packet after it passes. The size
+   and health lines stay as they were.
+
 ## Grill needed
 
 A page is missing for an area the PR touches. The brief goes under Drafts, not
@@ -157,46 +202,6 @@ folder, else `rules-drafts-<owner>-<repo>` next to the checkout). Refuse a path
 inside the checkout. The business line stays `incomplete, merge only after:
 rules page for <area>, then rerun business for <area>` until the page exists
 and business is rerun for that area. A missing page never passes.
-
-## Rerun: "rerun business for <area>"
-
-The user names the exact packet path. A rerun writes into the same folder and
-the same `packet.md`. Only 1 writer at a time. Run no size, security or
-health step.
-
-RR1. **Check.** Run
-   `python tools/business_verdict.py rerun-check --packet <packet folder> --head <current PR head> [--drafts <drafts folder>]`.
-   Exit 1 with `refuse: PR head moved`: stop and ask for a new full run. Exit 3
-   (short packet, O19): stop and ask the user. Exit 0: it prints the base and
-   default commits from the identity line (`use base`, `use default`) and any
-   `page changed since the first run: <area>` lines. Copy those lines into
-   Not checked.
-RR2. **Read the same commits.** Use the base and default commits the tool
-   printed, never a newer default branch head. Run step 3 with them, with the
-   area's new page (a new draft in the drafts folder, or the page now on the
-   default branch commit named in the identity line; a page merged after the
-   first run is not on that commit, so use the draft).
-RR3. **Replace the area.** Redo steps 4 to 6 for that area only. Replace that
-   area's entries by their `area` field in every field of the packet, in
-   `check-record.json` and in `rules-pages.json`. Rewrite the draft message.
-   Remove the grill brief of that area when its page now exists.
-RR4. **Rebuild the verdict.** Update `runs/business-areas.json` with every
-   area the PR touches, the other areas as they were. Run the step 7 command.
-   Fixing 1 area must not pass business while another area is still
-   `grill needed`.
-RR5. **Security line rule.** If the rerun added a page that says who may do
-   what, run
-   `python tools/business_verdict.py security-line --line "<current security line>" --area <area>`
-   and use its output as the security line. A security `pass` becomes
-   `incomplete` with `merge only after: rerun security for <area>`. An
-   `incomplete` keeps its reason and gains that reason. A `fail` stays `fail`
-   and gains `also: rerun security for <area>`. A line that says `not asked` or
-   `not checked` stays as it is. Whether a page "says who may do what" is a
-   reading call (open question O10): state your reason in 1 line.
-RR6. **Add the rerun line.** Under the verdict lines add
-   `business rerun for <area>, <YYYY-MM-DD>, head <full head sha>`. Run the
-   packet check again (step 9) and show the packet after it passes. The size
-   and health lines stay as they were.
 
 ## Finish checklist
 
