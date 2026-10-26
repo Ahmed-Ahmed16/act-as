@@ -7,7 +7,7 @@ alone is never a finding. This mode runs no size, business or security check.
 Not written here yet, each in its own later step:
 
 - The 8 translation checks and the user visible text pointer: ticket 38.
-- `clean-code-guard`, `test-guard`, `docs-guard`, `debate-review`: ticket 37.
+- `clean-code-guard`, `test-guard`, `docs-guard`, `debate-review`: see the block "Guard skills and debate-review (ticket 37)" below.
 
 Their steps are marked below. Until they exist, say each one is
 `not checked: <name> not built yet`. Health is then `incomplete`, never `pass`.
@@ -265,6 +265,34 @@ Before each step, run `cards.py reviewer health <step number>`, for example
     not sent; never send it. Run `python tools/packet_check.py <packet folder>`
     after the last write and show the packet only after `packet_check: pass`
     (`REV-P08`). Save the end snapshot and compare it with the start one.
+
+## Guard skills and debate-review (ticket 37)
+
+The helper is `python tools/guard_run.py`. It decides; you read the result.
+
+1. Skills. `guard_run.py skills clean-code-guard test-guard docs-guard debate-review`.
+   A missing one gives `not checked: <skill> not installed`. Work without it,
+   and health is `incomplete`.
+2. Which files. `guard_run.py targets <changed files>` sorts them. Changed PHP
+   outside tests goes to `clean-code-guard`, and Blade files count as PHP here
+   (G6). A PR that changes only Blade files still gets the code guard. Changed
+   tests go to `test-guard`. Changed docs go to `docs-guard`. All 3 guards are
+   report only: they never edit, fix or post. A `must fix` from a guard is only
+   as sure as your own reading of the code.
+3. `debate-review`. Full run only, never in a health only or size only run.
+   Run `guard_run.py debate --pr <url> --author <PR author login> --out-dir <packet folder>/debate`.
+   It always passes `--dry-run`. Never run `debate-review` by hand, and never
+   use `--post-draft`, `--force` or any posting flag. It keeps no worktree: if
+   one is left behind, the line says so.
+4. The team rule. The PR author login must be on the team login list. The list
+   is private: its path comes from the environment variable `ACT_AS_TEAM_LIST`
+   (set in the private harness config), never from a public file. Never copy a
+   login from it into the packet. Results: a listed login runs the debate; an
+   unlisted login gives `not checked: debate-review skipped, PR from outside the
+   team`; a missing or empty list gives `not checked: team list missing`. Neither
+   is ever treated as inside the team.
+5. Every `not checked` line from this block goes into the check record and makes
+   health `incomplete`. A debate finding is a pointer until you confirm it in the code.
 
 ## Finish checklist
 
