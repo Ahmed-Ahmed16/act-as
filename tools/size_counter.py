@@ -38,34 +38,69 @@ def git_bytes(repo, *args):
 
 
 def changed_files(repo, comparison):
-    raw = git_bytes(repo, 'diff', '--no-renames', '--raw', '-z', '--abbrev=40', comparison)
-    numstat = git_bytes(repo, 'diff', '--no-renames', '--numstat', '-z', comparison)
-    tokens = raw.split(b'\0')
-    if tokens[-1] or len(tokens) % 2 != 1:
-        raise GitError('git raw output has an unfinished file')
+    raw = git_bytes(repo, 'diff', '-M', '--raw', '-z', '--abbrev=40', comparison)
+    numstat = git_bytes(repo, 'diff', '-M', '--numstat', '-z', comparison)
+    files = raw_files(raw)
+    counts = numstat_counts(numstat)
+    if files.keys() != counts.keys():
+        raise GitError('git numstat output does not match raw files')
+    return [dict(file, added=counts[paths][0], deleted=counts[paths][1])
+            for paths, file in files.items()]
+
+
+def nul_records(output, label):
+    tokens = output.split(b'\0')
+    if tokens[-1]:
+        raise GitError(f'git {label} output has an unfinished file')
+    return iter(tokens[:-1])
+
+
+def raw_files(raw):
+    # Cases: empty diff, 1 path, 2 rename paths; missing, empty, or duplicate paths.
+    records = nul_records(raw, 'raw')
     files = {}
-    for index in range(0, len(tokens) - 1, 2):
-        metadata = tokens[index].split()
-        if len(metadata) != 5:
+    for record in records:
+        metadata = record.split()
+        if len(metadata) != 5 or not re.fullmatch(rb'[ACDMRTUXB][0-9]*', metadata[4]):
             raise GitError('git raw output has bad file fields')
-        path = tokens[index + 1]
-        files[path] = {'path': path.decode('utf-8', 'surrogateescape'),
-                       'status': metadata[4].decode('ascii'),
-                       'old_blob': metadata[2], 'new_blob': metadata[3]}
-    for record in numstat.split(b'\0'):
-        if not record:
-            continue
+        path = next(records, b'')
+        old_path = b''
+        if metadata[4].startswith(b'R'):
+            old_path, path = path, next(records, b'')
+            if not old_path:
+                raise GitError('git raw rename is missing its old path')
+        paths = (old_path, path)
+        if not path or paths in files:
+            raise GitError('git raw output has a missing or duplicate path')
+        files[paths] = {'path': path.decode('utf-8', 'surrogateescape'),
+                        'old_path': old_path.decode('utf-8', 'surrogateescape'),
+                        'status': metadata[4].decode('ascii'),
+                        'old_blob': metadata[2], 'new_blob': metadata[3]}
+    return files
+
+
+def numstat_counts(numstat):
+    # A rename has an empty inline path, then 2 NUL terminated paths.
+    records = nul_records(numstat, 'numstat')
+    counts = {}
+    for record in records:
         fields = record.split(b'\t', 2)
-        if len(fields) != 3 or fields[2] not in files:
-            raise GitError('git numstat output does not match raw files')
+        if len(fields) != 3:
+            raise GitError('git numstat output has bad file fields')
         added, deleted, path = fields
+        old_path = b''
+        if not path:
+            old_path, path = next(records, b''), next(records, b'')
+            if not old_path:
+                raise GitError('git numstat rename is missing its old path')
+        paths = (old_path, path)
+        if not path or paths in counts:
+            raise GitError('git numstat output has a missing or duplicate path')
         if any(count != b'-' and not count.isdigit() for count in (added, deleted)):
             raise GitError('git numstat output has bad line counts')
-        files[path]['added'] = 0 if added == b'-' else int(added)
-        files[path]['deleted'] = 0 if deleted == b'-' else int(deleted)
-    if any('added' not in file for file in files.values()):
-        raise GitError('git raw file is missing from numstat output')
-    return list(files.values())
+        counts[paths] = (0 if added == b'-' else int(added),
+                         0 if deleted == b'-' else int(deleted))
+    return counts
 
 
 def non_public_blobs(repo, revision):
@@ -110,13 +145,17 @@ def count_files(files, head_blobs, base_blobs):
     rows = []
     for file in files:
         kind = file_kind(file, head_blobs, base_blobs)
+        if file['old_path']:
+            old_file = dict(file, path=file['old_path'], status='D')
+            if file_kind(old_file, head_blobs, base_blobs) == 'counted':
+                kind = 'counted'
         lines = file['added'] + file['deleted']
         if kind != 'counted':
             left_out[LEFT_OUT_NAMES[kind]]['lines'] += lines
             left_out[LEFT_OUT_NAMES[kind]]['files'] += 1
-        status = {'A': 'added', 'M': 'modified', 'D': 'deleted'}.get(
-            file['status'], 'other:' + file['status'].lower())
-        rows.append(dict(path=file['path'], old_path='', status=status, kind=kind,
+        status = {'A': 'added', 'M': 'modified', 'D': 'deleted', 'R': 'renamed'}.get(
+            file['status'][0], 'other:' + file['status'].lower())
+        rows.append(dict(path=file['path'], old_path=file['old_path'], status=status, kind=kind,
                          counted_lines=lines if kind == 'counted' else 0, hunks=[]))
     added = sum(file['added'] for file in files)
     deleted = sum(file['deleted'] for file in files)
@@ -132,8 +171,9 @@ def count_files(files, head_blobs, base_blobs):
 
 def file_hunks(repo, comparison, row, file_index):
     # A literal path keeps names such as fruit [1].py from matching other files.
-    patch = git_bytes(repo, 'diff', '--no-renames', '-U0', comparison,
-                      '--', ':(literal)' + row['path'])
+    paths = [row['old_path'], row['path']] if row['old_path'] else [row['path']]
+    patch = git_bytes(repo, 'diff', '-M', '-U0', comparison,
+                      '--', *(':(literal)' + path for path in paths))
     hunks = []
     for number, header in enumerate(HUNK_HEADER.finditer(patch), 1):
         deleted, added = header.groups()
