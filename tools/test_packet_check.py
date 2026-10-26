@@ -1,3 +1,4 @@
+import json
 import shutil
 import subprocess
 import sys
@@ -37,6 +38,27 @@ def replace_body(packet, heading, body):
     return before + f'## {heading}\n{body}\n' + separator + after
 
 
+def good_inputs():
+    entries = [dict(id=entry_id, mode='security', area='', kind='check',
+                    tool_result='Ran the orchard check.', reading_result='Read orchard.py.',
+                    word='pass', reason='', base_read='', head_read='')
+               for entry_id in [*(f'S{number}' for number in range(1, 23)), 'L1', 'L5', 'RA', 'RB']]
+    for entry in entries[-2:]:
+        entry.update(mode='business', area='orchard', kind='rule',
+                     base_read='baseline: none, new feature', head_read='Read orchard.py.')
+    return {
+        'check-record.json': {'required_ids': ['RA', 'RB'], 'entries': entries},
+        'files.json': {'files': [dict(path='orchard.py', old_path='', status='added',
+                                    kind='counted', counted_lines=120,
+                                    hunks=[{'id': 'h1', 'counted_lines': 70},
+                                           {'id': 'h2', 'counted_lines': 50}])]},
+        'split-plan.json': {'groups': [], 'first_group_parts': [], 'unplaced': []},
+        'rules-pages.json': {'areas': [dict(area='orchard', page='orchard.md',
+                                          commit='d' * 40,
+                                          rules=[{'id': 'RA', 'status': 'active'},
+                                                 {'id': 'RB', 'status': 'active'}])]}}
+
+
 class PacketCheckTests(unittest.TestCase):
     # Boundaries: missing/empty/duplicate/order, word suffixes, labels/reasons,
     # each money form, all identity keys, bad paths/bytes, and multiple failures.
@@ -53,6 +75,21 @@ class PacketCheckTests(unittest.TestCase):
         self.packet.mkdir()
         self.path = self.packet / 'packet.md'
         self.path.write_text(good_packet(), encoding='utf-8')
+        self.inputs = good_inputs()
+        self.write_inputs()
+
+    def write_inputs(self):
+        for filename, contents in self.inputs.items():
+            (self.packet / filename).write_text(json.dumps(contents), encoding='utf-8')
+
+    def split_packet(self):
+        self.inputs['split-plan.json']['groups'] = [
+            dict(name='orchard', entry_points=['orchard.py'], estimate=70, hunks=['h1']),
+            dict(name='grove', entry_points=['grove.py'], estimate=50, hunks=['h2'])]
+        self.write_inputs()
+        groups = 'group: orchard, 70 counted lines\ngroup: grove, 50 counted lines'
+        packet = replace_body(good_packet(), 'Split plan', groups)
+        return replace_body(packet, 'Drafts, not sent', groups)
 
     def run_check(self, *args):
         return subprocess.run([sys.executable, '-E', '-P', '-X', 'utf8', '-B',
@@ -140,6 +177,8 @@ class PacketCheckTests(unittest.TestCase):
                 self.assert_pass(good_packet().replace(MONEY_NO, money))
 
     def test_missing_part_names_fields_with_no_content(self):
+        self.inputs['split-plan.json']['unplaced'] = ['h1', 'h2']
+        self.write_inputs()
         for heading in [*HEADINGS[:3], HEADINGS[3], HEADINGS[7]]:
             for body in ['none', 'unknown', 'not checked', 'not checked:',
                          'unknown\nnot checked:']:
@@ -157,6 +196,8 @@ class PacketCheckTests(unittest.TestCase):
         for heading in HEADINGS[4:6]:
             with self.subTest(heading=heading):
                 self.assert_pass(replace_body(good_packet(), heading, 'none found after reading'))
+        self.inputs['split-plan.json']['unplaced'] = ['h1', 'h2']
+        self.write_inputs()
         self.assert_pass(replace_body(good_packet(), 'Split plan', 'Separate cart and account changes.'))
 
     def test_not_checked_empty_reports_only_its_own_rule(self):
@@ -211,6 +252,200 @@ class PacketCheckTests(unittest.TestCase):
         self.assertEqual(run.stdout.splitlines(), ['RULE safe-to-merge: contains safe to merge',
                                                   'RULE overall-line: line starts with overall or ready'])
         self.assertEqual(run.stderr, '')
+
+    # Boundaries: absent, blank, wrong types, 1 or many ids, repeat placements,
+    # optional split, exact group order, ignored kinds, and unknown hunk ids.
+    def test_bad_packet_check_record_id(self):
+        for mode in ['full', 'security']:
+            with self.subTest(mode=mode):
+                self.inputs['check-record.json']['entries'] = [
+                    entry for entry in good_inputs()['check-record.json']['entries']
+                    if entry['id'] not in ['S1', 'S22', 'L5']]
+                self.write_inputs()
+                self.assert_rule(good_packet().replace('mode=full', 'mode=' + mode),
+                                 'check-record-id', 'missing ids: S1, S22, L5')
+
+    def test_bad_packet_check_record_tool(self):
+        for bad in [None, '', ' \t', 7]:
+            with self.subTest(tool_result=bad):
+                self.inputs['check-record.json']['entries'][0]['tool_result'] = bad
+                self.write_inputs()
+                self.assert_rule(good_packet(), 'check-record-tool', 'missing tool_result: S1')
+
+    def test_bad_packet_check_record_reading(self):
+        del self.inputs['check-record.json']['entries'][0]['reading_result']
+        self.write_inputs()
+        self.assert_rule(good_packet(), 'check-record-reading', 'missing reading_result: S1')
+
+    def test_bad_packet_check_record_area(self):
+        self.inputs['check-record.json']['entries'][-1]['area'] = ' '
+        self.write_inputs()
+        self.assert_rule(good_packet(), 'check-record-area', 'missing area: RB')
+
+    def test_bad_packet_rule_base_read(self):
+        del self.inputs['check-record.json']['entries'][-1]['base_read']
+        self.write_inputs()
+        self.assert_rule(good_packet(), 'rule-base-read', 'missing base_read: RB')
+
+    def test_bad_packet_rule_head_read(self):
+        self.inputs['check-record.json']['entries'][-1]['head_read'] = ''
+        self.write_inputs()
+        self.assert_rule(good_packet(), 'rule-head-read', 'missing head_read: RB')
+
+    def test_bad_packet_rule_entry_missing(self):
+        self.inputs['rules-pages.json']['areas'].append(
+            dict(area='grove', page='grove.md', commit='e' * 40,
+                 rules=[{'id': 'R3', 'status': 'active'}, {'id': 'R4', 'status': 'retired'}]))
+        self.write_inputs()
+        self.assert_rule(good_packet(), 'rule-entry-missing', 'missing rule entries: R3, R4')
+
+    def test_bad_packet_security_line(self):
+        self.inputs['check-record.json']['entries'][0]['word'] = 'must fix'
+        self.write_inputs()
+        self.assert_rule(good_packet(), 'security-line', 'security must fix requires fail')
+
+    def test_bad_packet_hunk_unplaced(self):
+        packet = self.split_packet()
+        self.inputs['files.json']['files'][0]['hunks'].append({'id': 'h3', 'counted_lines': 0})
+        self.write_inputs()
+        self.assert_rule(packet, 'hunk-unplaced', 'unplaced hunks: h3')
+
+    def test_bad_packet_hunk_duplicate(self):
+        packet = self.split_packet()
+        for unplaced in [['h1'], ['h1', 'h1']]:
+            with self.subTest(unplaced=unplaced):
+                self.inputs['split-plan.json']['unplaced'] = unplaced
+                self.write_inputs()
+                self.assert_rule(packet, 'hunk-duplicate', 'duplicate hunks: h1')
+
+    def test_bad_packet_hunk_counts(self):
+        self.assert_rule(good_packet().replace('120 counted lines', '121 counted lines'),
+                         'hunk-counts', 'counted lines differ: packet 121, hunks 120')
+
+    def test_bad_packet_split_field(self):
+        packet = self.split_packet()
+        for body in ['group: orchard, 71 counted lines\ngroup: grove, 50 counted lines',
+                     'group: grove, 50 counted lines\ngroup: orchard, 70 counted lines',
+                     'No groups listed.']:
+            with self.subTest(body=body):
+                self.assert_rule(replace_body(packet, 'Split plan', body),
+                                 'split-field', 'group lines differ from split-plan.json')
+
+    def test_bad_packet_split_message(self):
+        packet = self.split_packet()
+        self.assert_rule(replace_body(packet, 'Drafts, not sent', 'Draft: Ask about orchard.'),
+                         'split-message', 'group lines differ from split-plan.json')
+
+    def test_security_fail_with_must_fix_passes(self):
+        self.inputs['check-record.json']['entries'][0]['word'] = 'must fix'
+        self.write_inputs()
+        self.assert_pass(good_packet().replace('security: pass', 'security: fail, 1 must fix'))
+
+    def test_required_ids_apply_without_built_in_security_ids(self):
+        self.inputs['check-record.json']['entries'] = self.inputs['check-record.json']['entries'][-2:]
+        self.write_inputs()
+        packet = good_packet().replace('mode=full', 'mode=business')
+        self.assert_pass(packet)
+        self.inputs['check-record.json']['required_ids'].append('C1')
+        self.write_inputs()
+        self.assert_rule(packet, 'check-record-id', 'missing ids: C1')
+
+    def test_split_groups_bullets_and_unknown_hunks_pass(self):
+        packet = self.split_packet()
+        self.inputs['split-plan.json']['groups'][0]['hunks'].append('absent')
+        self.write_inputs()
+        self.assert_pass(packet.replace('group: orchard', '- group: orchard').replace(
+            'group: grove', '* group: grove'))
+
+    def test_unplaced_hunks_and_ignored_file_kinds_pass(self):
+        packet = self.split_packet()
+        self.inputs['split-plan.json']['groups'][1]['hunks'] = []
+        self.inputs['split-plan.json']['unplaced'] = ['h2']
+        for kind in ['test', 'lock', 'generated', 'docs']:
+            self.inputs['files.json']['files'].append(
+                dict(path=kind + '.py', old_path='', status='added', kind=kind,
+                     counted_lines=900, hunks=[{'id': kind, 'counted_lines': 900}]))
+        self.write_inputs()
+        self.assert_pass(packet.replace('group: grove, 50', 'group: grove, 0'))
+
+    def test_hunk_counts_skips_size_without_count(self):
+        self.assert_pass(good_packet().replace('size: pass, 120 counted lines', 'size: not asked'))
+
+    def test_json_input_errors_precede_packet_rules(self):
+        for filename in self.inputs:
+            for contents in [None, b'', b' \t\r\n', b'{', b'[]', b'null', b'\xff']:
+                with self.subTest(filename=filename, contents=contents):
+                    self.write_inputs()
+                    target = self.packet / filename
+                    if contents is None:
+                        target.unlink()
+                    else:
+                        target.write_bytes(contents)
+                    self.path.write_text(good_packet() + 'safe to merge\n', encoding='utf-8')
+                    run = self.run_check(self.packet)
+                    self.assertEqual(run.returncode, 2, run.stdout + run.stderr)
+                    self.assertEqual(run.stdout, '')
+                    self.assertEqual(len(run.stderr.splitlines()), 1, run.stderr)
+                    self.assertTrue(run.stderr.startswith('packet_check: '), run.stderr)
+                    self.assertIn(filename, run.stderr)
+
+    def test_json_input_paths_must_be_files(self):
+        for filename in self.inputs:
+            with self.subTest(filename=filename):
+                target = self.packet / filename
+                target.unlink()
+                target.mkdir()
+                self.assert_bad_input(self.packet)
+                target.rmdir()
+                self.write_inputs()
+
+    def test_json_lists_and_object_entries_require_shapes(self):
+        cases = [('check-record.json', 'required_ids'), ('check-record.json', 'entries'),
+                 ('files.json', 'files'), ('split-plan.json', 'groups'),
+                 ('split-plan.json', 'first_group_parts'), ('split-plan.json', 'unplaced'),
+                 ('rules-pages.json', 'areas')]
+        for filename, key in cases:
+            for bad in [None, {}]:
+                with self.subTest(filename=filename, key=key, bad=bad):
+                    self.inputs = good_inputs()
+                    self.inputs[filename][key] = bad
+                    self.write_inputs()
+                    self.assert_bad_input(self.packet)
+        for filename, key in [('check-record.json', 'entries'), ('files.json', 'files'),
+                              ('split-plan.json', 'groups'), ('rules-pages.json', 'areas')]:
+            with self.subTest(filename=filename, key=key):
+                self.inputs = good_inputs()
+                self.inputs[filename][key] = ['bad']
+                self.write_inputs()
+                self.assert_bad_input(self.packet)
+
+    def test_nested_json_lists_and_object_entries_require_shapes(self):
+        for key in ['hunks', 'rules', 'entry_points']:
+            for bad in [None, {}, [None]]:
+                if key == 'entry_points' and bad == [None]:
+                    continue
+                with self.subTest(key=key, bad=bad):
+                    self.inputs = good_inputs()
+                    self.split_packet()
+                    if key == 'hunks':
+                        self.inputs['files.json']['files'][0][key] = bad
+                    elif key == 'rules':
+                        self.inputs['rules-pages.json']['areas'][0][key] = bad
+                    else:
+                        self.inputs['split-plan.json']['groups'][0][key] = bad
+                    self.write_inputs()
+                    self.assert_bad_input(self.packet)
+
+    def test_missing_entry_fields_are_rule_failures(self):
+        for filename, key, field in [('check-record.json', 'entries', 'reason'),
+                                     ('files.json', 'files', 'path'),
+                                     ('rules-pages.json', 'areas', 'page')]:
+            with self.subTest(filename=filename, field=field):
+                self.inputs = good_inputs()
+                del self.inputs[filename][key][0][field]
+                self.write_inputs()
+                self.assert_rule(good_packet(), 'input-fields',
+                                 f'missing fields: {filename}.{key}[0].{field}')
 
     def assert_bad_input(self, *args):
         run = self.run_check(*args)
