@@ -65,7 +65,7 @@ Before each step, run `cards.py reviewer size <step number>`, for example
    first`, but a size run uses `not asked`). The money line and Tests run are
    as above. Split plan says exactly `not asked: size run only`. Write no
    `group:` line anywhere, in Split plan or in Drafts, not sent. Drafts, not
-   sent says `none: size run only, no message drafted`. `split-plan.json`
+   sent says `not asked: size run only`. `split-plan.json`
    stays an empty list. Nothing in the packet says the PR is fine or safe;
    say plainly that it is over the cap and was only counted.
 
