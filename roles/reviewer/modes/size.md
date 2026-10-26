@@ -3,10 +3,10 @@
 Count the PR's changed lines against the 300 line cap. This mode counts and
 writes a packet. It runs no business, security or health check.
 
-This file covers a PR under the cap. Over the cap (301 or more counted
-lines) is not written here yet: a later step adds the short packet, the
-split plan and the draft message. Until then, on a count over 300, write the size
-result, stop, and say "over the cap: split plan not written yet".
+This file covers a PR under the cap and a PR over the cap (301 or more
+counted lines). Over the cap, the run still counts and writes a packet. It
+writes no split plan and no draft message. A split plan is asked for in
+another mode, not here.
 
 ## Steps
 
@@ -40,9 +40,10 @@ Before each step, run `cards.py reviewer size <step number>`, for example
    with no margin. The size line is
    `size: <pass or fail>, <n> counted lines, cap 300; left out: tests <n> (<k> files), lock files <n> (<k> files), generated <n> (<k> files), docs <n> (<k> files)`.
    Only the words "review it anyway" from the user lift the cap, and a size
-   mode run has nothing to lift. A fail goes to the over the cap note at the
-   top of this file.
-5. **Write the packet.** File `packet.md` in the packet folder, in the
+   mode run has nothing to lift. A fail is written as the over the cap
+   packet in step 5.
+5. **Write the packet.** (Over the cap: use the changes at the end of this
+   step.) File `packet.md` in the packet folder, in the
    packet format the packet check reads. Identity line with `mode=size`. The
    size line from step 4. The business, security and health lines each say
    `not asked: size run only`. The money line says
@@ -56,6 +57,18 @@ Before each step, run `cards.py reviewer size <step number>`, for example
    message to the author, never sent). Write the 3 other saved inputs
    (`check-record.json`, `split-plan.json`, `rules-pages.json`) with empty
    lists, beside `packet.md`.
+
+   **Over the cap (size line is `fail`).** Same file, same fields, with these
+   changes only. The size line is the step 4 fail line with its counts. The
+   business, security and health lines each say `not asked: size run only`
+   (the packet check also accepts `not checked: PR over the cap, split it
+   first`, but a size run uses `not asked`). The money line and Tests run are
+   as above. Split plan says exactly `not asked: size run only`. Write no
+   `group:` line anywhere, in Split plan or in Drafts, not sent. Drafts, not
+   sent says `not asked: size run only`. `split-plan.json`
+   stays an empty list. Nothing in the packet says the PR is fine or safe;
+   say plainly that it is over the cap and was only counted.
+
 6. **Packet check.** Run `python tools/packet_check.py <packet folder>`
    after the last write to the packet. Exit 0 prints `packet_check: pass`.
    Anything else: repair and run again, or withhold the packet. Show a
