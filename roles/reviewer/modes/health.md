@@ -6,7 +6,6 @@ alone is never a finding. This mode runs no size, business or security check.
 
 Not written here yet, each in its own later step:
 
-- H11 and the independent check (tests that prove nothing): ticket 36.
 - The 8 translation checks and the user visible text pointer: ticket 38.
 - `clean-code-guard`, `test-guard`, `docs-guard`, `debate-review`: ticket 37.
 
@@ -148,8 +147,38 @@ Before each step, run `cards.py reviewer health <step number>`, for example
     was already there and the PR only touched its file. It is `must fix` only
     with a shown burden (the PR made the 2nd copy) and a small fix named in
     1 line (for example "move the list to `config/uploads.php`"). No copy: `clean`.
-15. **H11 and the independent check.** Not written here. Ticket 36 fills this
-    step. Until it does, write `H11: not checked: independent check not built yet`.
+15. **H11 and the independent check (tests that prove nothing).** Reading
+    picks the tests; the tool breaks the code. Pick at most 3 tests that
+    assert money, login or deleting data in changed code. Find them by what
+    they call, not by a name search alone. None found: write `H11: does not
+    apply: no test in a risky area`. This never hides check H6 (risky area with
+    no test). Write the picks and the code line to break in a spec file, then
+    run `python tools/check11_run.py --repo <checkout> --spec <spec.json> --out <packet folder>/independent-check --image actas-reviewer:2026-10-26 --record runs/check-record.json --reading-result <word>`.
+    The tool works only in a throwaway copy, with the network off. It never
+    writes to the checkout (`REV-P01`, `REV-P03`); if the checkout changes, it
+    stops. Per test, it does these in order: a green run first; proof that the
+    test ran (at least 1 test and 1 assertion); the fault; the same test run
+    unchanged; the red must be an assertion failure, and its message is kept;
+    the copy is reset and compared with the checkout; the test runs green
+    again. The fault must contradict what the test asserts. Never a syntax
+    error. The spec holds a probe command that shows the asserted behaviour
+    before and after the fault. How to read the result per test:
+    - Green with the fault, and the probe shows the behaviour changed: the test
+      proves nothing. This is a `must fix` finding. Name the test and link
+      `independent-check.json` in Known risks.
+    - Green with the fault, and the probe shows no change: the fault was
+      harmless. Write `not checked: fault did not contradict the assertion`.
+      Pick a better fault or leave it. This never condemns the test.
+    - Red, but not from an assertion (a fatal error, a parse error): write
+      `not checked: red was not an assertion failure`.
+    - The tests cannot run here (no runner, no vendor folder, no network to
+      fetch it): write `not checked: tests cannot run here`. Do not install
+      anything to make them run.
+    - Red on the assertion, reset, green again: `clean` for that test.
+    The 2 `not checked` results make health `incomplete`. The result covers only
+    the tests picked: say "covers N picked tests" and never "the tests are good".
+    The command, the fault and the result stay in `independent-check.json`,
+    apart from the CI evidence; Known risks names that file.
 16. **Translation checks.** Not written here. Ticket 38 fills this step. Until
     it does, write `T1 to T8: not checked: translation checks not built yet`.
 17. **Pointers.** Every number from a tool or a guard is a pointer, including
