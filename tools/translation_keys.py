@@ -1,12 +1,28 @@
+"""Read language folders only, no network.
+
+Inputs: required --lang folder, optional --changed-files JSON list of paths or
+objects with path/filename fields, --report values, and --base-lang folder.
+Default output is a JSON gap list, including unreadable files. --report values
+prints an object with gaps, values (placeholders and plural form counts),
+placeholder_gaps (ignoring :count), no_letters (ar/en script checks),
+locales_not_checked_for_letters, and changed_old_values (shared string keys).
+--base-lang requires --report values; without it changed_old_values is empty.
+Nonstring values and PHP expressions have no text and skip value checks.
+Exit 0 prints a report. Bad input exits 2 with 1 stderr line and no stdout.
+"""
+
 import argparse
 import json
 import os
 import re
 import sys
+import unicodedata
 from pathlib import Path
 
 
 TOKEN = re.compile(r'''\s+|//[^\n]*|\#[^\n]*|/\*.*?\*/|<\?php\b|\?>|=>|'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*"|[+-]?\d+|[\w\\]+|.''', re.S)
+PLACEHOLDER = re.compile(r'(?<![\w:]):[A-Za-z_][A-Za-z0-9_]*')
+LETTER_SCRIPTS = {'ar': 'ARABIC', 'en': 'LATIN'}
 
 
 def php_tokens(text):
@@ -60,6 +76,9 @@ class PhpArray:
             raise ValueError('expected ' + expected)
 
     def array_keys(self):
+        return set(self.array_values())
+
+    def array_values(self):
         # Cases: empty arrays, leaves, nested arrays, trailing commas, missing delimiters.
         opening = self.take()
         if opening.lower() == 'array':
@@ -67,15 +86,18 @@ class PhpArray:
         elif opening != '[':
             raise ValueError('expected array')
         closing = ')' if opening.lower() == 'array' else ']'
-        leaves = set()
+        leaves = {}
         while self.peek() != closing:
             key = php_key(self.take())
             self.expect('=>')
             if self.peek() == '[' or self.peek().lower() == 'array':
-                leaves.update(key + '.' + child for child in self.array_keys())
+                leaves.update((key + '.' + child, text) for child, text in self.array_values().items())
             else:
+                start = self.position
                 self.skip_expression(closing)
-                leaves.add(key)
+                token = self.tokens[start]
+                leaves[key] = (php_key(token) if self.position == start + 1
+                               and token.startswith(("'", '"')) else None)
             if self.peek() == closing:
                 break
             self.expect(',')
@@ -112,16 +134,20 @@ class PhpArray:
 
 
 def php_keys(text):
+    return set(php_values(text))
+
+
+def php_values(text):
     parser = PhpArray(text)
     parser.expect('<?php')
     parser.expect('return')
-    keys = parser.array_keys()
+    translations = parser.array_values()
     parser.expect(';')
     if parser.peek() == '?>':
         parser.take()
     if parser.peek():
         raise ValueError('unexpected text after array')
-    return keys
+    return translations
 
 
 def raise_walk_error(error):
@@ -149,13 +175,17 @@ def invalid_json_constant(token):
 
 
 def file_keys(path, shape):
+    return set(file_values(path, shape))
+
+
+def file_values(path, shape):
     text = path.read_text(encoding='utf-8-sig')
     if shape == 'php':
-        return php_keys(text)
+        return php_values(text)
     translations = json.loads(text, parse_constant=invalid_json_constant)
     if not isinstance(translations, dict):
         raise ValueError('JSON must be an object')
-    return set(translations)
+    return {key: text if isinstance(text, str) else None for key, text in translations.items()}
 
 
 def changed_paths(path):
@@ -180,20 +210,30 @@ def touched_file(shape, filename, locales, changed):
                         for path in changed for suffix in candidates) else 'no'
 
 
-def key_gaps(lang, changed):
+def read_translations(lang):
     locales, files = translation_files(lang)
     groups, excluded, entries = {}, {}, []
     for path, locale, shape, filename in files:
         group = (shape, filename)
         try:
-            keys = file_keys(path, shape)
+            translations = file_values(path, shape)
         except (OSError, UnicodeError, ValueError, RecursionError) as error:
             excluded.setdefault(group, set()).add(locale)
             reason = ' '.join(str(error).splitlines())[:120]
             entries.append(dict(file=path.relative_to(lang).as_posix(), shape=shape,
                                 unreadable=True, reason=reason))
         else:
-            groups.setdefault(group, {}).setdefault(locale, set()).update(keys)
+            groups.setdefault(group, {}).setdefault(locale, {}).update(translations)
+    return locales, groups, excluded, entries
+
+
+def key_gaps(lang, changed):
+    return gaps_from_catalog(read_translations(lang), changed)
+
+
+def gaps_from_catalog(catalog, changed):
+    locales, groups, excluded, unreadable = catalog
+    entries = list(unreadable)
     for (shape, filename), per_locale in sorted(groups.items()):
         eligible = locales - excluded.get((shape, filename), set())
         all_keys = set().union(*per_locale.values())
@@ -208,6 +248,66 @@ def key_gaps(lang, changed):
     return sorted(entries, key=lambda entry: (entry['shape'], entry.get('key', ''), entry['file']))
 
 
+def string_values(catalog):
+    return {(shape, filename, key, locale): text
+            for (shape, filename), per_locale in catalog[1].items()
+            for locale, translations in per_locale.items()
+            for key, text in translations.items() if text is not None}
+
+
+def value_identity(identity):
+    shape, filename, key, locale = identity
+    return dict(key=key if shape == 'json' else filename[:-4] + '.' + key,
+                shape=shape, file=filename, locale=locale)
+
+
+def placeholder_gaps(values):
+    groups, gaps = {}, []
+    for entry in values:
+        group = (entry['key'], entry['shape'], entry['file'])
+        groups.setdefault(group, {})[entry['locale']] = set(entry['placeholders']) - {':count'}
+    for (key, shape, filename), per_locale in groups.items():
+        all_names = set().union(*per_locale.values())
+        missing = sorted(locale for locale, names in per_locale.items() if all_names - names)
+        if len(per_locale) >= 2 and missing:
+            gaps.append(dict(key=key, shape=shape, file=filename,
+                             placeholders_by_locale={locale: sorted(names) for locale, names in per_locale.items()},
+                             locales_missing_any=missing))
+    return gaps
+
+
+def letter_script(locale):
+    return LETTER_SCRIPTS.get(re.split(r'[_-]', locale, maxsplit=1)[0])
+
+
+def lacks_language_letters(text, locale):
+    # Cases: no letters, another script only, matching letters, mixed scripts.
+    script = letter_script(locale)
+    if script is None:
+        return False
+    letters = [ch for ch in PLACEHOLDER.sub('', text) if ch.isalpha()]
+    return bool(letters) and not any(unicodedata.name(ch, '').startswith(script) for ch in letters)
+
+
+def values_report(catalog, changed, base_lang):
+    head = string_values(catalog)
+    base = string_values(read_translations(base_lang)) if base_lang is not None else {}
+    values, no_letters, changed_old = [], [], []
+    for identity, text in sorted(head.items()):
+        entry = value_identity(identity)
+        # Range prefixes do not change the number of pipe parts, even empty ones.
+        plural_forms = len(text.split('|')) if '|' in text else None
+        values.append(dict(entry, placeholders=sorted(set(PLACEHOLDER.findall(text))), plural_forms=plural_forms))
+        if lacks_language_letters(text, entry['locale']):
+            no_letters.append(entry)
+        if identity in base and base[identity] != text:
+            changed_old.append(dict(entry, old=base[identity], new=text))
+    return dict(gaps=gaps_from_catalog(catalog, changed), values=values,
+                placeholder_gaps=placeholder_gaps(values), no_letters=no_letters,
+                locales_not_checked_for_letters=sorted(locale for locale in catalog[0] if letter_script(locale) is None),
+                changed_old_values=changed_old)
+
+
 class Arguments(argparse.ArgumentParser):
     def error(self, message):
         self.exit(2, 'translation_keys.py: ' + ' '.join(message.splitlines()) + '\n')
@@ -217,11 +317,22 @@ def main(args):
     parser = Arguments(description='List gaps between translation key sets.', allow_abbrev=False)
     parser.add_argument('--lang', type=Path, required=True)
     parser.add_argument('--changed-files', type=Path)
+    parser.add_argument('--report', choices=['values'])
+    parser.add_argument('--base-lang', type=Path)
     options = parser.parse_args(args)
     if not options.lang.is_dir():
         parser.error('lang must be a readable directory')
+    if options.base_lang is not None:
+        if options.report != 'values':
+            parser.error('base-lang requires --report values')
+        if not options.base_lang.is_dir():
+            parser.error('base-lang must be a readable directory')
     try:
-        entries = key_gaps(options.lang, changed_paths(options.changed_files))
+        changed = changed_paths(options.changed_files)
+        if options.report == 'values':
+            entries = values_report(read_translations(options.lang), changed, options.base_lang)
+        else:
+            entries = key_gaps(options.lang, changed)
     except (OSError, UnicodeError, ValueError, RecursionError) as error:
         parser.error(str(error))
     print(json.dumps(entries, ensure_ascii=True))
