@@ -1,3 +1,13 @@
+"""Test language folders only, no network.
+
+Inputs: required --lang, optional --changed-files JSON path list, --report values,
+and --base-lang comparison folder (requires --report values). Default output is
+a JSON gap list. Values output has gaps, values, placeholder_gaps, no_letters,
+locales_not_checked_for_letters, and changed_old_values. Exit 0 means a report
+was printed. Bad inputs exit 2 with 1 stderr line and no stdout.
+"""
+
+import ast
 import json
 import subprocess
 import sys
@@ -201,6 +211,164 @@ class TranslationKeyTests(unittest.TestCase):
         self.assertEqual(run.returncode, 0, run.stderr)
         self.assertEqual(run.stderr, '')
         self.assertEqual([entry['key'] for entry in json.loads(run.stdout)], ['luma'])
+
+    def test_named_placeholder_gap_ignores_count_and_keeps_all_locales(self):
+        self.write('ava.json', json.dumps({'luma': 'Hi :name, :count items', 'zora': 'Hi :count'}))
+        self.write('bex.json', json.dumps({'luma': 'Hi, :count items', 'zora': 'Hi'}))
+        report = self.entries('--report', 'values')
+        self.assertEqual(report['placeholder_gaps'], [
+            dict(key='luma', shape='json', file='<locale>.json',
+                 placeholders_by_locale={'ava': [':name'], 'bex': []}, locales_missing_any=['bex'])])
+        self.assertEqual(report['values'][0],
+                         dict(key='luma', shape='json', file='<locale>.json', locale='ava',
+                              placeholders=[':count', ':name'], plural_forms=None))
+
+    def test_placeholder_boundaries_and_union_find_each_missing_locale(self):
+        self.write('ava.json', json.dumps({'luma': ':zora :_luma :zora :name7 word:fake ::fake é:fake'}))
+        self.write('bex.json', json.dumps({'luma': ':other'}))
+        self.write('cyv.json', json.dumps({'luma': ':zora :_luma :name7 :other'}))
+        report = self.entries('--report', 'values')
+        self.assertEqual(report['placeholder_gaps'], [
+            dict(key='luma', shape='json', file='<locale>.json',
+                 placeholders_by_locale={'ava': [':_luma', ':name7', ':zora'], 'bex': [':other'],
+                                         'cyv': [':_luma', ':name7', ':other', ':zora']},
+                 locales_missing_any=['ava', 'bex'])])
+
+    def test_plural_counts_are_reported_without_judging_them(self):
+        for locale, phrase in [('ava', 'one|many'), ('bex', 'a|b|c')]:
+            self.write(f'{locale}.json', json.dumps({'luma': phrase, 'zora': 'plain',
+                                                   'range': '{0} none|[1,19] some|[20,*] many',
+                                                   'empty': '|'}))
+            self.write(f'{locale}/niva.php', "<?php return ['luma' => '" + phrase + "'];")
+        report = self.entries('--report', 'values')
+        self.assertEqual([(entry['shape'], entry['key'], entry['locale'], entry['plural_forms'])
+                          for entry in report['values']],
+                         [('json', 'empty', 'ava', 2), ('json', 'empty', 'bex', 2),
+                          ('json', 'luma', 'ava', 2), ('json', 'luma', 'bex', 3),
+                          ('json', 'range', 'ava', 3), ('json', 'range', 'bex', 3),
+                          ('json', 'zora', 'ava', None), ('json', 'zora', 'bex', None),
+                          ('php', 'niva.luma', 'ava', 2), ('php', 'niva.luma', 'bex', 3)])
+        self.assertEqual(report['gaps'], [])
+
+    def test_changed_values_only_include_shared_string_leaves(self):
+        base = self.root / 'base'
+        base.mkdir()
+        (base / 'ava.json').write_text(json.dumps({'luma': 'A', 'removed': 'R', 'same': 'S',
+                                                  'number': 1, 'text': 'before', 'blank': ''}), encoding='utf-8')
+        self.write('ava.json', json.dumps({'luma': 'B', 'added': 'N', 'same': 'S',
+                                         'number': 'now text', 'text': False, 'blank': 'after'}))
+        (base / 'ava').mkdir()
+        (base / 'ava/niva.php').write_text("<?php return ['luma' => 'A', 'joined' => 'A' . 'B'];",
+                                          encoding='utf-8')
+        self.write('ava/niva.php', "<?php return ['luma' => 'B', 'joined' => 'C'];")
+        self.assertEqual(self.entries('--report', 'values', '--base-lang', base)['changed_old_values'], [
+            dict(key='blank', shape='json', file='<locale>.json', locale='ava', old='', new='after'),
+            dict(key='luma', shape='json', file='<locale>.json', locale='ava', old='A', new='B'),
+            dict(key='niva.luma', shape='php', file='niva.php', locale='ava', old='A', new='B')])
+        self.assertEqual(self.entries('--report', 'values')['changed_old_values'], [])
+
+    def test_letter_rules_skip_neutral_text_and_unknown_locales(self):
+        phrases = {'wrong': 'Save', 'count': ':count', 'digits': '50%', 'symbols': '☀ % !',
+                   'right': 'حفظ', 'mixed': 'Save حفظ', 'blank': '', 'nonstring': 7}
+        for locale in ['ar', 'ar_EG', 'ar-EG']:
+            self.write(f'{locale}.json', json.dumps(phrases))
+        for locale in ['en', 'en_GB', 'en-GB']:
+            self.write(f'{locale}.json', json.dumps({'wrong': 'حفظ', 'right': 'Save', 'count': ':name'}))
+        for locale in ['fr', 'ava', 'enx']:
+            self.write(f'{locale}.json', '{"wrong": "Save"}')
+        report = self.entries('--report', 'values')
+        self.assertEqual(report['no_letters'], [
+            dict(key='wrong', shape='json', file='<locale>.json', locale=locale)
+            for locale in ['ar', 'ar-EG', 'ar_EG', 'en', 'en-GB', 'en_GB']])
+        self.assertEqual(report['locales_not_checked_for_letters'], ['ava', 'enx', 'fr'])
+
+    def test_clean_and_empty_reports_have_all_output_fields(self):
+        expected = dict(gaps=[], values=[], placeholder_gaps=[], no_letters=[],
+                        locales_not_checked_for_letters=[], changed_old_values=[])
+        self.assertEqual(self.entries('--report', 'values'), expected)
+        self.write('ar.json', json.dumps({'luma': 'حفظ :name'}))
+        self.write('en.json', json.dumps({'luma': 'Save :name'}))
+        expected['values'] = [dict(key='luma', shape='json', file='<locale>.json', locale=locale,
+                                   placeholders=[':name'], plural_forms=None) for locale in ['ar', 'en']]
+        self.assertEqual(self.entries('--report', 'values'), expected)
+
+    def test_php_values_use_only_literal_leaves_and_keep_key_functions(self):
+        source = r'''<?php return ['outer' => array('luma' => "Hi\n:name|Hi :count"),
+            'escaped' => 'It\'s :name', 'joined' => ':ghost' . ':other',
+            'called' => niva(':ghost'), 'number' => 7];'''
+        self.write('ava/sector/niva.php', source)
+        self.write('bex/sector/niva.php', "<?php return ['outer' => ['luma' => 'Hi :count']];")
+        report = self.entries('--report', 'values')
+        self.assertEqual(report['values'], [
+            dict(key='sector/niva.escaped', shape='php', file='sector/niva.php', locale='ava',
+                 placeholders=[':name'], plural_forms=None),
+            dict(key='sector/niva.outer.luma', shape='php', file='sector/niva.php', locale='ava',
+                 placeholders=[':count', ':name'], plural_forms=2),
+            dict(key='sector/niva.outer.luma', shape='php', file='sector/niva.php', locale='bex',
+                 placeholders=[':count'], plural_forms=None)])
+        self.assertEqual(report['placeholder_gaps'], [
+            dict(key='sector/niva.outer.luma', shape='php', file='sector/niva.php',
+                 placeholders_by_locale={'ava': [':name'], 'bex': []}, locales_missing_any=['bex'])])
+        self.assertEqual(report['gaps'], self.entries())
+        from translation_keys import file_keys, php_keys
+        self.assertEqual(php_keys(source), {'outer.luma', 'escaped', 'joined', 'called', 'number'})
+        self.assertEqual(file_keys(self.lang / 'ava/sector/niva.php', 'php'), php_keys(source))
+
+    def test_unreadable_base_and_head_files_skip_value_checks(self):
+        self.write('ava.json', '{"luma": "Hi :name", "number": 3}')
+        self.write('bex.json', '{')
+        self.write('ava/niva.php', "<?php return ['luma' => 'B'];")
+        base = self.root / 'base'
+        (base / 'ava').mkdir(parents=True)
+        (base / 'ava.json').write_bytes(b'\xff')
+        (base / 'ava/niva.php').write_text('<?php return [;', encoding='utf-8')
+        changes = self.root / 'files.json'
+        changes.write_text('["ava/niva.php"]', encoding='utf-8')
+        report = self.entries('--report', 'values', '--base-lang', base, '--changed-files', changes)
+        self.assertEqual(report['gaps'], self.entries('--changed-files', changes))
+        self.assertEqual(len(report['values']), 2)
+        self.assertEqual(report['changed_old_values'], [])
+        self.assertEqual(report['placeholder_gaps'], [])
+        self.assertEqual(report['locales_not_checked_for_letters'], ['ava', 'bex'])
+
+    def test_values_bad_arguments_exit_2_with_1_stderr_line(self):
+        plain = self.write('plain', 'A')
+        for args in [('--report', 'values'), ('--lang', self.root / 'absent', '--report', 'values'),
+                     ('--lang', plain, '--report', 'values'),
+                     ('--lang', self.lang, '--base-lang', self.lang),
+                     ('--lang', self.lang, '--report', 'gaps'),
+                     ('--lang', self.lang, '--report', 'values', '--base-lang', self.root / 'absent'),
+                     ('--lang', self.lang, '--report', 'values', '--base-lang', plain),
+                     ('--lang', self.lang, '--report', 'values', '--changed-files', self.root / 'absent')]:
+            with self.subTest(args=args):
+                run = self.run_cli(*args)
+                self.assertEqual(run.returncode, 2, run.stderr)
+                self.assertEqual(len(run.stderr.splitlines()), 1, run.stderr)
+                self.assertTrue(run.stderr.startswith('translation_keys.py: '), run.stderr)
+                self.assertEqual(run.stdout, '')
+        changes = self.root / 'files.json'
+        for content in ['{', '{}', '[1]', '[{}]', '[{"path": 1}]']:
+            with self.subTest(content=content):
+                changes.write_text(content, encoding='utf-8')
+                run = self.run_cli('--lang', self.lang, '--report', 'values', '--changed-files', changes)
+                self.assertEqual(run.returncode, 2)
+                self.assertEqual(len(run.stderr.splitlines()), 1)
+                self.assertEqual(run.stdout, '')
+
+    def test_source_imports_no_network_modules(self):
+        def network_imports(source):
+            modules = set()
+            for node in ast.walk(ast.parse(source)):
+                if isinstance(node, ast.Import):
+                    modules.update(alias.name.split('.')[0] for alias in node.names)
+                elif isinstance(node, ast.ImportFrom) and node.module:
+                    modules.add(node.module.split('.')[0])
+            return modules & {'socket', 'urllib', 'http', 'requests'}
+
+        self.assertEqual(network_imports('import socket, urllib.request\nfrom http import client\nimport requests'),
+                         {'socket', 'urllib', 'http', 'requests'})
+        self.assertEqual(network_imports('# import socket\nphrase = "import requests"'), set())
+        self.assertEqual(network_imports(self.script.read_text(encoding='utf-8')), set())
 
 
 if __name__ == '__main__':
