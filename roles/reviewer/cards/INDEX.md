@@ -17,9 +17,40 @@ only `approved` cards. Policy cards (`REV-P`) always apply.
 | REV-P10 | all | Before the first comparison | approved | Record one comparison base at the start of the review. Use that same base for... |
 | REV-P11 | all | When deciding whether a finding is must fix | approved | Mark a finding must fix only when code confirms the whole path to the harm. |
 
+## Size and comparison base cards
+
+Approved by Ahmed on 2026-10-27. Cards with a check id are mapped in the
+check map below; the others are rules of the size step.
+
+| id | mode | trigger | status | check id | rule in short |
+| --- | --- | --- | --- | --- | --- |
+| REV-101 | size, full | When counting changed lines | approved | none | Count added plus deleted lines per file, read from git. |
+| REV-102 | size, full | When a changed file is binary | approved | none | A binary file counts 0; read git's dashes as 0. |
+| REV-103 | size, full | When a changed file was renamed | approved | none | A renamed or moved file counts like GitHub counts it: a pure move 0, a move with edits only its changed lines. |
+| REV-104 | size, full | When sorting changed files for the count | approved | none | Tests, lock files, generated files and docs are left out; the rest counts. |
+| REV-105 | size, full | When a changed file is deleted | approved | none | Lines in a deleted file stay counted. |
+| REV-106 | size, full | When a changed file sits under public/ | approved | none | A public/ file is generated only if its blob id equals a source file's. |
+| REV-107 | size, full | When a git call in the counter fails | approved | none | A failed git call gives "not checked", never a number. |
+| REV-108 | size, full | When writing the size line | approved | none | The size line shows verdict, counted lines, cap and what was left out by kind. |
+| REV-109 | size, full | When a PR is over the 300 line cap | approved | Q26 | An over the cap PR goes back with a request to split it. |
+| REV-110 | size, full | When choosing the reading order of a PR | approved | Q25 | Tests may be read first; no fixed order. |
+| REV-111 | size, full | When reading the list of changed files | approved | Q27 | Name a file unrelated to the stated task as a lead; it only sets the reading order. |
+| REV-112 | size, full | When proposing or judging a split into parts | approved | Q28 | Each part of a split builds and passes its own tests. |
+| REV-113 | size, full | When reading the PR description | approved | Q29 | Check the description says what was checked, skipped, and the risks. |
+| REV-114 | all | When freezing the comparison base of an open PR | approved | none | Base is the merge base of the PR head and the base branch head. |
+| REV-115 | all | When choosing what to compare the PR head with | approved | none | Never compare with the moving base tip or a local or fresh default branch. |
+| REV-116 | all | When the PR is a stacked part | approved | none | If the base branch head is an ancestor of the PR head, it is the base. |
+| REV-117 | all | When the PR is already merged | approved | none | Use GitHub's recorded base with a three dot diff; if not proved, "not checked", no count. |
+| REV-118 | all | When freezing the PR head at the start | approved | none | Freeze the PR head as a full commit id once. |
+| REV-119 | all | When a step needs the default branch | approved | none | Read the default branch name from GitHub at the start. |
+| REV-120 | all | When writing the identity line | approved | none | The identity line names the commits used and the date. |
+
+Q24 (proof shown by the author) stays on the gap list: the research found no
+primary source, only community posts.
+
 ## Check map
 
-Policy cards cover role rules. Every check listed below still needs a check card.
+Policy cards cover role rules. A check mapped to `gap` still needs a check card.
 
 | check | card id or gap |
 | --- | --- |
@@ -47,11 +78,11 @@ Policy cards cover role rules. Every check listed below still needs a check card
 | `Q22` | `gap` |
 | `Q23` | `gap` |
 | `Q24` | `gap` |
-| `Q25` | `gap` |
-| `Q26` | `gap` |
-| `Q27` | `gap` |
-| `Q28` | `gap` |
-| `Q29` | `gap` |
+| `Q25` | `REV-110` |
+| `Q26` | `REV-109` |
+| `Q27` | `REV-111` |
+| `Q28` | `REV-112` |
+| `Q29` | `REV-113` |
 | `Q30` | `gap` |
 | `Q31` | `gap` |
 | `Q32` | `gap` |
@@ -125,11 +156,6 @@ Policy cards cover role rules. Every check listed below still needs a check card
 - Q22
 - Q23
 - Q24
-- Q25
-- Q26
-- Q27
-- Q28
-- Q29
 - Q30
 - Q31
 - Q32
