@@ -85,6 +85,20 @@ class HealthParseTests(unittest.TestCase):
         self.assertEqual(self.parse('phpmd', 'Acme failed', 2,
                                     '--files', 2)['result'], 'not checked')
 
+    def test_phpmd_progress_with_no_violations_is_clean(self):
+        text = ' 0/1 [progress bar]   0%\n 1/1 [progress bar] 100%\n'
+        document = self.parse('phpmd', text, 0, '--files', 1)
+        self.assertEqual(document['result'], 'clean')
+
+    def test_phpmd_progress_preserves_only_the_violation(self):
+        text = ' 0/1 [progress bar]   0%\n 1/1 [progress bar] 100%\n'
+        violation = ('/w/Bad.php:3  ExcessiveMethodLength  The method longOne() has '
+                     '113 lines of code. Current threshold is set to 100. '
+                     'Avoid really long methods.')
+        document = self.parse('phpmd', text + violation + '\n', 2, '--files', 1)
+        self.assertEqual(document['result'], 'finding')
+        self.assertEqual(document['violations'], [violation])
+
     def test_acme_phpmd_failed_exits_name_first_useful_line(self):
         for code in (1, 3, 255, 4):
             with self.subTest(code=code):
