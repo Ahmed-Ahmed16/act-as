@@ -41,7 +41,7 @@ Missing entry fields exit 1, using input-fields if no other rule fails.
 Full and security identity modes require S1 through S22, L1, L5 plus required_ids.
 Record checks precede hunk checks and exact ordered group line comparisons.
 Only counted file hunks contribute lines. Unknown hunk ids contribute 0.
-Hunk placement checks apply unless Split plan starts with not needed.
+Hunk placement checks skip not needed and size mode fail with not asked.
 
 Packet types add rules to these common checks. Full packets need size
 counts, Tests run tied to the head, a money form above, and not needed
@@ -58,6 +58,8 @@ text in the other verdicts. Money outside security says
 not checked: money not looked at, <mode> run only. Tests run also allows
 not asked: <mode> run only. Size fail without cap stop verdicts requires
 the cap line unless mode is size.
+In size mode, fail needs Split plan exactly not asked: size run only.
+That case forbids group lines in Split plan and Drafts, not sent.
 Tests run rejects any 40 hex commit other than the head. The exact
 not checked: no CI run on head <sha> form must name that head.
 CI run id and result syntax are not defined, so they are not checked.
@@ -84,6 +86,7 @@ IDENTITY = {'repo': r'[^/\s;]+/[^/\s;]+', 'pr': r'[0-9]+',
             'date': r'[0-9]{4}-[0-9]{2}-[0-9]{2}'}
 CAP_LINE = "reviewed over the cap, on Ahmed's word"
 CAP_STOP = 'not checked: PR over the cap, split it first'
+GROUP_LINE = r'^[ \t]*(?:[-*] )?group: (.+), ([0-9]+) counted lines[ \t]*$'
 UNKNOWN = re.compile(r'___[ \t]*\(([^()\n]+)\)')
 NO_REASON = {'___', 'unknown', 'not checked', 'not checked:'}
 MONEY_END = '. Needs the separate Opus review before merge. Not done by this review.'
@@ -172,7 +175,12 @@ def split_failures(lines, inputs):
     placements.update(plan['unplaced'])
     bodies = field_bodies(lines)
     failures = []
-    if not bodies.get('Split plan', '').startswith('not needed'):
+    size_over_cap = (any(re.search(r'(?:^|;)\s*mode=size\s*(?:;|$)', identity)
+                         for identity in line_values(lines, 'identity')[:1]) and
+                     any(verdict_word(verdict) == 'fail' for verdict in line_values(lines, 'size')[:1]))
+    split_body = bodies.get('Split plan', '')
+    if not (split_body.startswith('not needed') or
+            (size_over_cap and split_body.startswith('not asked'))):
         missing = [str(key) for key in counts if key not in placements]
         duplicates = [str(key) for key, count in placements.items() if count > 1]
         if missing:
@@ -187,8 +195,7 @@ def split_failures(lines, inputs):
                 for group in groups]
     for rule, heading in [('split-field', 'Split plan'), ('split-message', 'Drafts, not sent')]:
         actual = [(match[1], int(match[2])) for match in re.finditer(
-            r'^[ \t]*(?:[-*] )?group: (.+), ([0-9]+) counted lines[ \t]*$',
-            bodies.get(heading, ''), re.MULTILINE)]
+            GROUP_LINE, bodies.get(heading, ''), re.MULTILINE)]
         if actual != expected:
             failures.append((rule, 'group lines differ from split-plan.json'))
     return failures
@@ -376,6 +383,12 @@ def single_failures(verdicts, bodies, identity):
     not_asked = f'not asked: {mode} run only'
     size = verdicts['size']
     over_cap = mode == 'size' and verdict_word(size) == 'fail'
+    if over_cap:
+        if bodies.get('Split plan', '') != not_asked:
+            failures.append(('size-split-plan', 'Split plan must say ' + not_asked))
+        if any(re.search(GROUP_LINE, bodies.get(heading, ''), re.MULTILINE)
+               for heading in ['Split plan', 'Drafts, not sent']):
+            failures.append(('size-no-draft', 'size run only forbids split group lines'))
     allowed = ['pass', 'fail', 'incomplete'] + (['not checked'] if mode == 'business' else [])
     bad = [field for field in ['business', 'security', 'health']
            if (field == mode and verdict_word(verdicts[field]) not in allowed) or

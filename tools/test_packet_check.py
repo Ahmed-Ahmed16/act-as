@@ -149,13 +149,68 @@ class PacketCheckTests(unittest.TestCase):
         self.assert_pass(single_packet())
 
     def test_single_size_over_cap_not_asked_passes(self):
-        self.assert_pass(replace_line(single_packet('size'), 'size', 'fail, 120 counted lines'))
+        packet = replace_line(single_packet('size'), 'size', 'fail, 120 counted lines')
+        self.assert_pass(replace_body(packet, 'Split plan', 'not asked: size run only'))
 
     def test_single_size_over_cap_not_checked_passes(self):
         packet = replace_line(single_packet('size'), 'size', 'fail, 120 counted lines')
         for field in ['business', 'security', 'health']:
             packet = replace_line(packet, field, STOP)
-        self.assert_pass(packet)
+        self.assert_pass(replace_body(packet, 'Split plan', 'not asked: size run only'))
+
+    # Cases: exact stop text, other plan text, groups in either body,
+    # absent or repeated placements, empty drafts, and other packet modes.
+    def test_single_size_over_cap_pass_verdicts_fail_single_mode_line(self):
+        packet = replace_line(single_packet('size'), 'size', 'fail, 120 counted lines')
+        packet = replace_body(packet, 'Split plan', 'not asked: size run only')
+        for field in ['business', 'security', 'health']:
+            packet = replace_line(packet, field, 'pass')
+        self.assert_rules(packet, 'single-mode-line')
+
+    def test_single_size_over_cap_groups_in_plan_fail_both_size_rules(self):
+        split = self.split_packet()
+        packet = replace_line(single_packet('size'), 'size', 'fail, 120 counted lines')
+        groups = split.split('## Split plan\n', 1)[1].split('\n## ', 1)[0].strip()
+        packet = replace_body(packet, 'Split plan', groups)
+        for draft, extra_rules in [(groups, []), ('Draft: Ask about orchard.', ['split-message'])]:
+            with self.subTest(draft=draft):
+                self.assert_rules(replace_body(packet, 'Drafts, not sent', draft),
+                                  'size-split-plan', 'size-no-draft', *extra_rules)
+
+    def test_single_size_over_cap_groups_in_drafts_fail_size_no_draft(self):
+        packet = replace_line(single_packet('size'), 'size', 'fail, 120 counted lines')
+        packet = replace_body(packet, 'Split plan', 'not asked: size run only')
+        for prefix in ['', '  ', '- ', '* ']:
+            with self.subTest(prefix=prefix):
+                self.assert_rules(replace_body(packet, 'Drafts, not sent',
+                                              prefix + 'group: orchard, 70 counted lines'),
+                                  'split-message', 'size-no-draft')
+
+    def test_single_size_over_cap_other_plan_text_fails_size_split_plan(self):
+        self.inputs['split-plan.json']['unplaced'] = ['h1', 'h2']
+        self.write_inputs()
+        packet = replace_line(single_packet('size'), 'size', 'fail, 120 counted lines')
+        for body in ['not needed: x', 'Separate cart changes.',
+                     'not asked: business run only', 'not asked: size run only\nExtra text.']:
+            with self.subTest(body=body):
+                self.assert_rules(replace_body(packet, 'Split plan', body), 'size-split-plan')
+
+    def test_single_size_over_cap_skips_duplicate_and_unplaced_hunks(self):
+        self.inputs['split-plan.json']['unplaced'] = ['h1', 'h1']
+        self.write_inputs()
+        packet = replace_line(single_packet('size'), 'size', 'fail, 120 counted lines')
+        self.assert_pass(replace_body(packet, 'Split plan', 'not asked: size run only'))
+
+    def test_other_packets_not_asked_plan_still_checks_hunks(self):
+        for mode in ['size', 'business']:
+            with self.subTest(mode=mode):
+                packet = replace_body(single_packet(mode), 'Split plan', 'not asked: size run only')
+                self.assert_rules(packet, 'hunk-unplaced')
+
+    def test_single_size_over_cap_drafts_still_need_content(self):
+        packet = replace_line(single_packet('size'), 'size', 'fail, 120 counted lines')
+        packet = replace_body(packet, 'Split plan', 'not asked: size run only')
+        self.assert_rules(replace_body(packet, 'Drafts, not sent', ''), 'missing-part')
 
     def test_rerun_packet_passes(self):
         self.assert_pass(self.rerun_packet())
@@ -253,7 +308,8 @@ class PacketCheckTests(unittest.TestCase):
         self.assert_rules(replace_line(single_packet(), 'size', 'pass, 120 counted lines'), 'single-size')
 
     def test_single_size_asked_counts_missing(self):
-        self.assert_rules(replace_line(single_packet('size'), 'size', 'fail'), 'single-size')
+        packet = replace_line(single_packet('size'), 'size', 'fail')
+        self.assert_rules(replace_body(packet, 'Split plan', 'not asked: size run only'), 'single-size')
 
     def test_single_money_breaks_q2a(self):
         self.assert_rules(replace_line(single_packet(), 'money', MONEY_NO), 'single-money')
