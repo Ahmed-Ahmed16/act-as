@@ -103,6 +103,17 @@ Before each step, run `cards.py reviewer health <step number>`, for example
    scripts. A name or route hit is a candidate: trace the call and read the
    assertion before you write "covered". When nothing covers a risky area, this
    check is its own finding: "no test found by name, route or caller".
+
+   **Risky areas in a health only run (O13, used by H6 and the independent check).**
+   With no business step, read the changed files for the 3 fixed kinds only:
+   money, logins, deleting data. Run `python tools/risky_areas.py --repo
+   <checkout> --files <changed files>`. Each area it lists is a candidate:
+   open the file and read whether the line really touches that kind. Drop a
+   hit you read and rejected, and say so. These areas feed H6 (find tests for
+   each) and the picks in step 15. A plain change gives none: write "risky
+   areas: none found in the changed files". Not checked always holds
+   "business risky areas: not asked: health run only". Never write the tool's
+   list as a finding by itself.
 9. **H7 Old tests edited or deleted.** Tool: `git diff -M --name-status
    <comparison base> <head>`. Judge each deleted or changed test by lost
    protection: does it still fail when the code breaks? A reason in the PR text
