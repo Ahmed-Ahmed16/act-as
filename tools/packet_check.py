@@ -60,9 +60,16 @@ not asked: <mode> run only. Size fail without cap stop verdicts requires
 the cap line unless mode is size.
 In size mode, fail needs Split plan exactly not asked: size run only.
 That case forbids group lines in Split plan and Drafts, not sent.
-Tests run rejects any 40 hex commit other than the head. The exact
-not checked: no CI run on head <sha> form must name that head.
-CI run id and result syntax are not defined, so they are not checked.
+In full and single mode packets, tests-ci-form requires each non blank
+Tests run line to say CI run <id> on <40 hex>: <pass|fail>. The id uses
+letters A to Z or a to z, digits, underscores, or hyphens. Hex may use
+either case. The exact not checked: no CI run on head <sha> form is also
+allowed, as is not asked: <mode> run only in single mode packets.
+Missing content stays with missing-part. Short packets skip tests-ci-form.
+The existing full-tests-run and single-tests-run rules reject any 40 hex
+commit other than the head and require the no CI run form to name that head.
+The rerun-field rule requires identity rerun=yes exactly when a line
+starting business rerun exists. Other rerun values are invalid.
 A business rerun line needs a known area, an ISO date, and the head.
 A business line claiming business rerun also requires that line.
 Rerun business verdicts name every rules page area. Security must fix
@@ -340,6 +347,18 @@ def tests_on_head(body, head):
     return all(commit.lower() == head.lower() for commit in re.findall(r'\b' + HEX + r'\b', body))
 
 
+def tests_ci_failures(bodies, not_asked=''):
+    tests = bodies.get('Tests run', '')
+    if not tests or 'Tests run' in missing_parts(bodies):
+        return []
+    if tests == not_asked or re.fullmatch(r'not checked: no CI run on head ' + HEX, tests):
+        return []
+    if any(not re.fullmatch(r'CI run [A-Za-z0-9_-]+ on ' + HEX + r': (?:pass|fail)', line)
+           for line in tests.splitlines() if line.strip()):
+        return [('tests-ci-form', 'Tests run needs CI run <id> on <40 hex>: <pass|fail>')]
+    return []
+
+
 def full_failures(verdicts, bodies, head):
     failures = []
     forbidden = [field for field in ['size', 'business', 'security', 'health']
@@ -358,7 +377,7 @@ def full_failures(verdicts, bodies, head):
     plan = bodies.get('Split plan', '')
     if plan and 'Split plan' not in missing and not re.match(r'not needed(?=$|:)', plan):
         failures.append(('full-split-plan', 'Split plan must say not needed'))
-    return failures
+    return failures + tests_ci_failures(bodies)
 
 
 def short_failures(verdicts, bodies, plan):
@@ -407,7 +426,15 @@ def single_failures(verdicts, bodies, identity):
     if (tests and 'Tests run' not in missing_parts(bodies) and
             tests != not_asked and not tests_on_head(tests, head)):
         failures.append(('single-tests-run', 'Tests run needs the head or ' + not_asked))
-    return failures
+    return failures + tests_ci_failures(bodies, not_asked)
+
+
+def rerun_field_failures(lines, identity):
+    rerun = identity.get('rerun')
+    has_line = any(line.lstrip().startswith('business rerun') for line in lines)
+    if (('rerun' in identity and rerun != 'yes') or (rerun == 'yes') != has_line):
+        return [('rerun-field', 'identity rerun=yes and a business rerun line must occur together')]
+    return []
 
 
 def rerun_failures(lines, inputs, identity):
@@ -448,7 +475,7 @@ def packet_type_failures(lines, inputs):
     verdicts = {field: next(iter(line_values(lines, field)), '')
                 for field in ['size', 'business', 'security', 'health', 'money']}
     bodies = field_bodies(lines)
-    failures = rerun_failures(lines, inputs, identity)
+    failures = rerun_failures(lines, inputs, identity) + rerun_field_failures(lines, identity)
     if identity['mode'] != 'full':
         return failures + single_failures(verdicts, bodies, identity)
     identity_index = next(index for index, line in enumerate(lines) if line.startswith('identity:'))

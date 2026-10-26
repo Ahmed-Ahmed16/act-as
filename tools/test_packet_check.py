@@ -25,7 +25,7 @@ HEAD = 'a' * 40
 
 def good_packet():
     bodies = ['The cart shows ___ (tax) after a country change.',
-              'cart.py reads the country.', f'CI run 12, commit {HEAD}, result pass.',
+              'cart.py reads the country.', f'CI run 12 on {HEAD}: pass',
               '___ (tax): The owner has not supplied the tax rule.',
               'none', 'none', 'not needed: The change fits together.',
               'Draft: Ask the owner for the tax rule.']
@@ -127,6 +127,7 @@ class PacketCheckTests(unittest.TestCase):
 
     def rerun_packet(self):
         packet = replace_line(good_packet(), 'business', 'pass, orchard rebuilt')
+        packet = packet.replace('date=2026-10-26', 'date=2026-10-26; rerun=yes')
         return f'business rerun for orchard, 2026-10-26, head {HEAD}\n' + packet
 
     def assert_rules(self, packet, *rules):
@@ -228,13 +229,29 @@ class PacketCheckTests(unittest.TestCase):
         self.assert_pass(replace_line(good_packet(), 'business', 'not checked: rules page unavailable'))
 
     def test_full_tests_run_other_commit(self):
-        for body in [f'CI run 12, commit {"b" * 40}, result pass.',
-                     f'CI run 12, commits {HEAD}, {"b" * 40}, result pass.']:
+        for body in [f'CI run 12 on {"b" * 40}: pass',
+                     f'CI run 12 on {HEAD}: pass\nCI run 13 on {"b" * 40}: fail']:
             with self.subTest(body=body):
                 self.assert_rules(replace_body(good_packet(), 'Tests run', body), 'full-tests-run')
 
-    def test_full_tests_run_id_and_result_syntax_not_assumed(self):
-        self.assert_pass(replace_body(good_packet(), 'Tests run', 'CI run 12, result pass.'))
+    # Boundaries: exact CI syntax, 1 or many lines, blank lines, hex case,
+    # wrong head, absent body, and each direction of the rerun field link.
+    def test_full_tests_run_bad_ci_form(self):
+        for body in [f'CI run 12, commit {HEAD}, result pass.', 'CI run 12, result pass.',
+                     f'CI run 12.3 on {HEAD}: pass', f'CI run 12 on {HEAD}: passed',
+                     f'CI run 12 on {HEAD}: pass.', f'CI run 12 on {HEAD}: pass\nExtra text.']:
+            with self.subTest(body=body):
+                self.assert_rules(replace_body(good_packet(), 'Tests run', body), 'tests-ci-form')
+
+    def test_full_tests_run_ci_pass_result_passes(self):
+        self.assert_pass(replace_body(good_packet(), 'Tests run', f'CI run acme_12-A on {HEAD}: pass'))
+
+    def test_full_tests_run_ci_fail_result_passes(self):
+        self.assert_pass(replace_body(good_packet(), 'Tests run', f'CI run 12 on {HEAD}: fail'))
+
+    def test_full_tests_run_multiple_ci_lines_pass(self):
+        body = f'CI run 12 on {HEAD}: pass\n\n \t\nCI run orchard_13-A on {HEAD.upper()}: fail'
+        self.assert_pass(replace_body(good_packet(), 'Tests run', body))
 
     def test_full_tests_run_missing(self):
         self.assert_rules(replace_body(good_packet(), 'Tests run', ''), 'missing-part')
@@ -316,7 +333,18 @@ class PacketCheckTests(unittest.TestCase):
 
     def test_single_tests_run_outside_forms(self):
         self.assert_rules(replace_body(single_packet(), 'Tests run', 'not asked: health run only'),
-                          'single-tests-run')
+                          'single-tests-run', 'tests-ci-form')
+
+    def test_single_tests_run_bad_ci_form(self):
+        packet = replace_body(single_packet(), 'Tests run', f'CI run 12, commit {HEAD}, result pass.')
+        self.assert_rules(packet, 'tests-ci-form')
+
+    def test_single_tests_run_other_commit(self):
+        packet = replace_body(single_packet(), 'Tests run', f'CI run 12 on {"b" * 40}: pass')
+        self.assert_rules(packet, 'single-tests-run')
+
+    def test_single_tests_run_empty_body(self):
+        self.assert_rules(replace_body(single_packet(), 'Tests run', ''), 'missing-part')
 
     def test_single_tests_run_normal_o17_passes(self):
         self.assert_pass(single_packet())
@@ -345,6 +373,25 @@ class PacketCheckTests(unittest.TestCase):
     def test_rerun_line_missing_with_business_rerun_claim(self):
         packet = replace_line(good_packet(), 'business', 'pass, business rerun rebuilt orchard')
         self.assert_rules(packet, 'rerun-line')
+
+    def test_rerun_yes_without_line_fails_rerun_field(self):
+        packet = good_packet().replace('date=2026-10-26', 'date=2026-10-26; rerun=yes')
+        self.assert_rules(packet, 'rerun-field')
+
+    def test_rerun_line_without_field_fails_rerun_field(self):
+        self.assert_rules(self.rerun_packet().replace('; rerun=yes', ''), 'rerun-field')
+
+    def test_rerun_no_fails_rerun_field(self):
+        for packet in [good_packet(), self.rerun_packet().replace('; rerun=yes', '')]:
+            with self.subTest(packet=packet):
+                packet = packet.replace('date=2026-10-26', 'date=2026-10-26; rerun=no')
+                self.assert_rules(packet, 'rerun-field')
+
+    def test_rerun_other_values_fail_rerun_field(self):
+        for setting in ['', 'YES', 'true']:
+            with self.subTest(setting=setting):
+                packet = self.rerun_packet().replace('rerun=yes', 'rerun=' + setting)
+                self.assert_rules(packet, 'rerun-field')
 
     def test_rerun_line_bad_shape_date_head_or_area(self):
         packet = self.rerun_packet()
@@ -380,8 +427,10 @@ class PacketCheckTests(unittest.TestCase):
         self.inputs['check-record.json']['entries'][0]['word'] = 'incomplete'
         self.write_inputs()
         packet = single_packet().replace('business: incomplete', 'business: incomplete, orchard')
+        packet = packet.replace('date=2026-10-26', 'date=2026-10-26; rerun=yes')
         self.assert_pass(f'business rerun for orchard, 2026-10-26, head {HEAD}\n' + packet)
         packet = replace_line(self.short_packet(), 'business', STOP + ', orchard')
+        packet = packet.replace('date=2026-10-26', 'date=2026-10-26; rerun=yes')
         self.assert_pass(f'business rerun for orchard, 2026-10-26, head {HEAD}\n' + packet)
 
     def run_check(self, *args):
@@ -416,6 +465,7 @@ class PacketCheckTests(unittest.TestCase):
         swapped = packet.replace('## Tests run', '## PLACEHOLDER').replace(
             '## Files that matter most', '## Tests run').replace(
             '## PLACEHOLDER', '## Files that matter most')
+        swapped = replace_body(swapped, 'Tests run', f'CI run 12 on {HEAD}: pass')
         for bad in [packet.replace('# Review packet\n', ''),
                     '# Review packet\n' + packet, swapped,
                     packet.replace('## Pointers\n', ''),
