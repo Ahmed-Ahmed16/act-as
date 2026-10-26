@@ -43,7 +43,7 @@ def _target_problems(check_id, target, gaps, card_dir):
         if check_id not in gaps:
             return [f'{check_id}: gap missing from gap list']
         return []
-    if re.fullmatch(r'`REV-P\d{2}`', target):
+    if re.fullmatch(r'`REV-(?:P\d{2}|\d{3})`', target):
         return [f'{check_id}: {problem}' for problem in
                 _card_problems(target.strip('`'), card_dir)]
     return [f'{check_id}: row must name an approved card or gap in backticks']
@@ -121,6 +121,20 @@ class ReviewerCardIndexTests(unittest.TestCase):
             card.write_text('id: REV-P99\nstatus: draft\n', encoding='utf-8')
             problems = check_index(text, ['Q1'], card_dir)
         self.assertEqual(problems, ['Q1: REV-P99: card status is not approved'])
+
+    def test_numeric_card_id_is_accepted_and_still_must_be_approved(self):
+        text = '## Check map\n| `Q1` | `REV-999` |\n\n## Card gap list\n'
+        with tempfile.TemporaryDirectory(prefix='reviewer-index-') as folder:
+            card_dir = Path(folder)
+            card = card_dir / 'REV-999.md'
+            card.write_text('id: REV-999\nstatus: approved\n', encoding='utf-8')
+            self.assertEqual(check_index(text, ['Q1'], card_dir), [])
+            card.write_text('id: REV-999\nstatus: draft\n', encoding='utf-8')
+            problems = check_index(text, ['Q1'], card_dir)
+        self.assertEqual(problems, ['Q1: REV-999: card status is not approved'])
+        bad = text.replace('REV-999', 'REV-99')
+        self.assertEqual(check_index(bad, ['Q1'], card_dir),
+                         ['Q1: row must name an approved card or gap in backticks'])
 
     def test_real_policy_table_has_exactly_11_existing_cards(self):
         policy_ids = _policy_ids(self.text)
