@@ -17,15 +17,19 @@ O19): stop and ask the user.
 - Where: `docs/business-rules/<area>.md` on a fresh `origin/<default branch>`.
   1 page per area, named in business words (for example
   `lending-and-returns.md`). Nowhere else: no guessing from a README or a wiki.
-- Line 1 is `Covers:` and lists the files or folders the page covers, comma
-  separated. A title line `# ...` may sit above it. A folder ends in `/`.
-  Plain paths only, no wildcards.
+- A line `Covers:` sits within the first 5 lines of the page (a title line
+  `# ...` and a blank line may sit above it). It lists the files or folders
+  the page covers, comma separated. A folder ends in `/`. Plain files and
+  folders only. An entry with a wildcard or other pattern is not read: write
+  `not checked: Covers entry is a pattern` and make that area incomplete. The
+  plain entries on the same line still count.
 - A line `Checked at:` names the commit the statuses describe.
 - Each rule is a line that starts `R<n>.` and carries exactly 1 status word in
-  bold: `match`, `gap`, `owner` or `open`. A rule with 2 statuses or none is
-  not read (open question O6): write `not checked: rule <id> has <2 statuses
+  bold: `match`, `gap`, `owner` or `open`. A rule with 2 statuses is
+  "multiple" and stays unread, and so is a rule with none (settled 2026-10-27,
+  B15): write `not checked: rule <id> has <2 statuses
   or no status>` and make that area incomplete.
-- A page with no `Covers:` line is not applied. Write
+- A page with no `Covers:` line in its first 5 lines is not applied. Write
   `not checked: page has no Covers line` and make that area incomplete.
 - A draft page lives outside the checkout (the drafts folder the private
   overlay names, else `rules-drafts-<owner>-<repo>` next to the checkout). A

@@ -37,10 +37,13 @@ def changed_files(options):
 
 def parse_page(contents):
     lines = contents.decode('utf-8').replace('\r', '').split('\n')
-    cover_line = lines[1] if lines[0].startswith('# ') and len(lines) > 1 else lines[0]
+    cover_line = next((line for line in lines[:5] if line.startswith('Covers:')), '')
     covers_ok = cover_line.startswith('Covers:')
     covers = [entry.strip(' `\t') for entry in cover_line[7:].split(',')
               if entry.strip(' `\t')] if covers_ok else []
+    covers_patterns = sorted(entry for entry in covers if any(char in entry for char in '*?[]{}'))
+    covers = [entry for entry in covers if entry not in covers_patterns]
+    not_checked = ['Covers entry is a pattern'] if covers_patterns else []
     checked_at = next((line.partition(':')[2].strip() for line in lines
                        if line.startswith('Checked at:')), None)
     rules = []
@@ -50,7 +53,12 @@ def parse_page(contents):
             statuses = re.findall(r'\*\*(match|gap|owner|open)\*\*', line, re.I)
             status = statuses[0].lower() if len(statuses) == 1 else ('multiple' if statuses else 'none')
             rules.append(dict(id='R' + rule[1], status=status))
-    return dict(checked_at=checked_at, covers=sorted(covers), covers_ok=covers_ok, rules=rules)
+            if len(statuses) != 1:
+                reason = f'{len(statuses)} statuses' if statuses else 'no status'
+                not_checked.append(f'rule R{rule[1]} has {reason}')
+    return dict(checked_at=checked_at, covers=sorted(covers), covers_ok=covers_ok, rules=rules,
+                covers_patterns=covers_patterns, not_checked=not_checked,
+                area_incomplete=bool(not_checked) or not covers_ok)
 
 
 def load_pages(options, commit):
