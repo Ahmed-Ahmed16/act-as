@@ -110,6 +110,7 @@ def write_packet(options, commit, files, pages):
     report = dict(base=options.base, head=options.head, default_ref=options.default_ref,
                   default_commit=commit, files=files, no_area_found=unmapped,
                   areas=[page for page, _ in touched],
+                  pages_with_patterns=[page for page, _ in pages if page['covers_patterns']],
                   pages_without_covers=[page['area'] for page, _ in pages if not page['covers_ok']])
     runs = options.out / 'runs'
     runs.mkdir(parents=True, exist_ok=True)

@@ -121,6 +121,25 @@ class BusinessPagesTests(unittest.TestCase):
         self.assertEqual(area['files'], ['lib/Floop.php', 'src/Plim.php'])
         self.assertEqual(report['no_area_found'], [dict(path='src/Glorp.php', old_path=None)])
 
+    def test_pattern_only_page_keeps_its_explanation_in_the_packet(self):
+        # G33: rejected patterns must survive even without a mapped file.
+        self.page('zindle', 'Covers: app/*.php\n')
+        self.default = self.base = self.commit()
+        self.write('app/Glorp.php', 'floop\n')
+        report = self.packet(self.commit())
+        self.assertEqual(report['areas'], [])
+        self.assertEqual(report['no_area_found'], [dict(path='app/Glorp.php', old_path=None)])
+        self.assertEqual(len(report.get('pages_with_patterns', [])), 1)
+        page = report['pages_with_patterns'][0]
+        self.assertEqual(page['area'], 'zindle')
+        self.assertEqual(page['page'], 'docs/business-rules/zindle.md')
+        self.assertEqual(page['covers_patterns'], ['app/*.php'])
+        self.assertEqual(page['not_checked'], ['Covers entry is a pattern'])
+        self.assertTrue(page['area_incomplete'])
+        self.assertEqual(page['files'], [])
+        manifest = json.loads((self.out / 'rules-pages.json').read_text(encoding='utf-8'))
+        self.assertEqual(manifest['areas'], [])
+
     def test_path_boundaries_and_overlapping_pages(self):
         self.page('zindle', 'Covers: app/Loans, docs/, app/Vault.php\n')
         self.page('floop', 'Covers: app/Loans/\n')
