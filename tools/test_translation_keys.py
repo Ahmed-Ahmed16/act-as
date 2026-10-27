@@ -223,6 +223,22 @@ class TranslationKeyTests(unittest.TestCase):
                          dict(key='luma', shape='json', file='<locale>.json', locale='ava',
                               placeholders=[':count', ':name'], plural_forms=None))
 
+    def test_placeholder_case_variants_and_count_give_no_gap(self):
+        for en, ar in [(':Name', ':name'), (':NAME :Name :name', ':name'), (':COUNT', ''), (':Count', '')]:
+            with self.subTest(en=en, ar=ar):
+                self.write('en.json', json.dumps({'luma': 'Hi ' + en}))
+                self.write('ar.json', json.dumps({'luma': 'Hi ' + ar}))
+                self.assertEqual(self.entries('--report', 'values')['placeholder_gaps'], [])
+
+    def test_missing_placeholder_reports_gap_with_original_spelling(self):
+        for name in [':name', ':Name', ':NAME']:
+            with self.subTest(name=name):
+                self.write('en.json', json.dumps({'luma': 'Hi ' + name}))
+                self.write('ar.json', json.dumps({'luma': 'Hi'}))
+                self.assertEqual(self.entries('--report', 'values')['placeholder_gaps'], [
+                    dict(key='luma', shape='json', file='<locale>.json',
+                         placeholders_by_locale={'ar': [], 'en': [name]}, locales_missing_any=['ar'])])
+
     def test_placeholder_boundaries_and_union_find_each_missing_locale(self):
         self.write('ava.json', json.dumps({'luma': ':zora :_luma :zora :name7 word:fake ::fake é:fake'}))
         self.write('bex.json', json.dumps({'luma': ':other'}))
