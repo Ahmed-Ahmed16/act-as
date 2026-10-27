@@ -38,8 +38,8 @@ def git_bytes(repo, *args):
 
 
 def changed_files(repo, comparison):
-    raw = git_bytes(repo, 'diff', '-M', '--raw', '-z', '--abbrev=40', comparison)
-    numstat = git_bytes(repo, 'diff', '-M', '--numstat', '-z', comparison)
+    raw = git_bytes(repo, 'diff', '--no-color', '--no-ext-diff', '-M', '--raw', '-z', '--abbrev=40', comparison)
+    numstat = git_bytes(repo, 'diff', '--no-color', '--no-ext-diff', '-M', '--numstat', '-z', comparison)
     files = raw_files(raw)
     counts = numstat_counts(numstat)
     if files.keys() != counts.keys():
@@ -172,7 +172,8 @@ def count_files(files, head_blobs, base_blobs):
 def file_hunks(repo, comparison, row, file_index):
     # A literal path keeps names such as fruit [1].py from matching other files.
     paths = [row['old_path'], row['path']] if row['old_path'] else [row['path']]
-    patch = git_bytes(repo, 'diff', '-M', '-U0', comparison,
+    patch = git_bytes(repo, 'diff', '--no-color', '--no-ext-diff', '-M',
+                      '--inter-hunk-context=0', '-U0', comparison,
                       '--', *(':(literal)' + path for path in paths))
     hunks = []
     for number, header in enumerate(HUNK_HEADER.finditer(patch), 1):

@@ -1,13 +1,18 @@
 import json
+import io
 import os
 import shlex
 import subprocess
 import sys
 import tempfile
 import unittest
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
+from unittest.mock import patch
 
+import check11_run
 from check11_run import checkout_hashes, command_args
+from health_parse import run_cli
 from test_packet_check import good_inputs, good_packet, single_packet
 
 
@@ -61,9 +66,6 @@ if name == 'start_red':
 if name == 'start_none':
     print('OK (1 test, 0 assertions)')
     sys.exit(0)
-if name == 'reset_red' and Path('runs.jsonl').read_text().count('reset_red') == 3:
-    print('ERRORS!\\nTests: 1, Assertions: 0, Errors: 1.')
-    sys.exit(2)
 print('OK (1 test, 1 assertion)')
 '''
 
@@ -82,6 +84,34 @@ class RunTests(unittest.TestCase):
         self.out = self.root / 'evidence'
         self.record = self.root / 'check-record.json'
         self.spec = dict(command=f'{PYTHON} fakeunit.py {{test}}', tests=[self.pick()])
+        self.real_run = subprocess.run
+        self.docker_calls = []
+        self.git('init', '-q')
+        self.freeze()
+
+    def git(self, *args, **kwargs):
+        completed = self.real_run(['git', '-C', str(self.repo), *args],
+                                  capture_output=True, **kwargs)
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        return completed.stdout.decode().strip()
+
+    def freeze(self):
+        self.git('add', '.')
+        tree = self.git('write-tree')
+        self.head = self.git('-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid',
+                             'commit-tree', tree, input=b'Fixture\n')
+
+    def fake_docker(self, argv, **kwargs):
+        if argv[0] != 'docker':
+            return self.real_run(argv, **kwargs)
+        self.docker_calls.append(argv)
+        if argv[1] == 'stop':
+            return subprocess.CompletedProcess(argv, 0, '', '')
+        command = shlex.split(argv[-1])
+        # This fixture transport runs only the trusted fake, never a shell or PR code.
+        if command[:2] != [sys.executable.replace('\\', '/'), 'fakeunit.py']:
+            return subprocess.CompletedProcess(argv, 127, '', 'command not found')
+        return self.real_run([sys.executable, '-B', 'fakeunit.py', *command[2:]], **kwargs)
 
     def pick(self, name='good', probe='probe'):
         return dict(name=name, fault=dict(file='cart.php', old='GREEN', new='FAULT'),
@@ -91,9 +121,16 @@ class RunTests(unittest.TestCase):
         spec_path = self.root / 'spec.json'
         spec_path.write_text(json.dumps(self.spec), encoding='utf-8')
         return self.script('check11_run.py', '--repo', str(self.repo), '--spec', str(spec_path),
-                           '--out', str(self.out), *extra)
+                           '--out', str(self.out), '--image', 'fixture:image', '--head', self.head, *extra)
 
     def script(self, name, *args):
+        if name == 'check11_run.py':
+            stdout, stderr = io.StringIO(), io.StringIO()
+            with (patch.object(sys, 'argv', [name, *args]),
+                  patch.object(check11_run.subprocess, 'run', side_effect=self.fake_docker),
+                  redirect_stdout(stdout), redirect_stderr(stderr)):
+                code = run_cli(check11_run.main)
+            return subprocess.CompletedProcess(args, code, stdout.getvalue(), stderr.getvalue())
         return subprocess.run([sys.executable, '-B', str(TOOLS / name), *args],
                               capture_output=True, text=True,
                               env={**os.environ, 'PYTHONDONTWRITEBYTECODE': '1'})
@@ -114,7 +151,7 @@ class RunTests(unittest.TestCase):
             self.assertIn(message, run.stderr)
 
     def test_real_assertion_resets_to_green_and_checkout_stays_untouched(self):
-        before = {p.name: p.read_bytes() for p in self.repo.iterdir()}
+        before = checkout_hashes(self.repo)
         summary, report = self.checked()
         self.assertEqual(summary['result'], 'clean')
         self.assertIn('covers 1 picked tests', summary['reason'])
@@ -139,13 +176,13 @@ class RunTests(unittest.TestCase):
         self.assertEqual(steps[4]['exit_code'], 1)
         self.assertIn('Failed asserting', steps[4]['output'])
         argv = steps[0]['argv']
-        self.assertEqual(argv[:2], ['sh', '-c'])
-        self.assertEqual(argv[2], self.spec['command'].replace('{test}', 'good'))
+        self.assertEqual(argv[:2], ['docker', 'run'])
+        self.assertEqual(argv[-1], self.spec['command'].replace('{test}', 'good'))
         copy = Path(steps[0]['cwd'])
         self.assertNotEqual(copy, self.repo)
         self.assertFalse(copy.exists(), 'throwaway copy must be removed')
-        self.assertEqual(before, {p.name: p.read_bytes() for p in self.repo.iterdir()})
-        self.assertEqual(report['image'], None)
+        self.assertEqual(before, checkout_hashes(self.repo))
+        self.assertEqual(report['image'], 'fixture:image')
         self.assertEqual(report['command'], self.spec['command'])
 
     def test_green_test_with_contradicting_probe_is_finding(self):
@@ -219,8 +256,17 @@ class RunTests(unittest.TestCase):
                 self.assertEqual(report['tests'][0]['steps'][-1]['parsed']['state'], 'ok')
 
     def test_reset_must_return_to_green(self):
-        self.spec['tests'] = [self.pick('reset_red')]
-        _, report = self.checked()
+        transport = self.fake_docker
+
+        def fail_green_again(argv, **kwargs):
+            if (argv[:2] == ['docker', 'run'] and
+                    argv[argv.index('--name') + 1].endswith('-5')):
+                return subprocess.CompletedProcess(argv, 2,
+                    'ERRORS!\nTests: 1, Assertions: 0, Errors: 1.', '')
+            return transport(argv, **kwargs)
+
+        with patch.object(self, 'fake_docker', side_effect=fail_green_again):
+            _, report = self.checked()
         self.assertEqual(report['tests'][0]['tool_result'], 'not checked')
         self.assertEqual(report['tests'][0]['reason'], 'copy did not return to green after reset')
 
@@ -248,16 +294,23 @@ class RunTests(unittest.TestCase):
                          ['clean', 'not checked', 'finding'])
 
     def test_checkout_change_is_reported_as_exit_2(self):
-        script = self.repo / 'write_checkout.py'
-        script.write_text('from pathlib import Path\n'
-                          f'Path({str(self.source)!r}).write_text("CHANGED")\n', encoding='utf-8')
-        self.spec['command'] = f'{PYTHON} write_checkout.py; {self.spec["command"]}'
-        self.assert_bad(self.cli(), 'checkout changed')
+        transport = self.fake_docker
+
+        def write_checkout(argv, **kwargs):
+            if argv[:2] == ['docker', 'run']:
+                self.source.write_text('CHANGED')
+            return transport(argv, **kwargs)
+
+        with patch.object(self, 'fake_docker', side_effect=write_checkout):
+            self.assert_bad(self.cli(), 'checkout changed')
         self.assertEqual(self.source.read_text(), 'CHANGED')
 
     def test_hash_guard_ignores_git_file_and_generated_folders(self):
         before = checkout_hashes(self.repo)
-        (self.repo / '.git').write_text('gitdir: cart-worktree')
+        git_file_tree = self.root / 'worktree'
+        git_file_tree.mkdir()
+        (git_file_tree / '.git').write_text('gitdir: cart-worktree')
+        self.assertEqual(checkout_hashes(git_file_tree), {})
         for name in ['vendor', 'node_modules', 'storage']:
             (self.repo / name).mkdir()
             (self.repo / name / 'generated').write_text('cart cache')
@@ -350,6 +403,167 @@ class RunTests(unittest.TestCase):
         self.assertEqual(argv[argv.index('-v') + 1], copy + ':/work')
         self.assertEqual(argv[argv.index('-w') + 1], '/work')
         self.assertEqual(argv[-4:], ['cart:php', 'sh', '-c', 'php fakeunit.php cart'])
+
+    def test_review_G25_missing_image_is_a_single_line_refusal(self):
+        self.spec['tests'] = []
+        spec = self.root / 'spec.json'
+        spec.write_text(json.dumps(self.spec))
+        run = self.script('check11_run.py', '--repo', str(self.repo), '--spec', str(spec),
+                          '--out', str(self.out))
+        self.assert_bad(run, '--image')
+        self.assertEqual(self.docker_calls, [])
+        with self.assertRaisesRegex(ValueError, '--image'):
+            command_args('unused', self.repo, None)
+
+    def test_review_G26_external_tracked_link_is_not_checked(self):
+        outside = self.root / 'private.txt'
+        outside.write_text('PRIVATE FIXTURE')
+        blob = self.git('hash-object', '-w', '--stdin', input=str(outside).encode())
+        self.git('update-index', '--add', '--cacheinfo', f'120000,{blob},private-link')
+        tree = self.git('write-tree')
+        head = self.git('-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid',
+                        'commit-tree', tree, input=b'Link fixture\n')
+        summary, report = self.checked('--head', head)
+        self.assertEqual(summary['result'], 'not checked')
+        self.assertIn('symlink leaves the tree', report['tests'][0]['reason'])
+        self.assertEqual(self.docker_calls, [])
+        self.assertNotIn('PRIVATE FIXTURE', json.dumps(report))
+        self.spec['tests'] = []
+        summary, report = self.checked('--head', head)
+        self.assertEqual(summary['result'], 'not checked')
+        self.assertEqual(report['tests'], [])
+
+    def test_review_G27_swapped_target_cannot_overwrite_outside_file(self):
+        outside = self.root / 'outside.txt'
+        outside.write_bytes(b'KEEP')
+        transport = self.fake_docker
+
+        def swap_target(argv, **kwargs):
+            completed = transport(argv, **kwargs)
+            if argv[:2] == ['docker', 'run'] and argv[argv.index('--name') + 1].endswith('-4'):
+                target = Path(kwargs['cwd']) / 'cart.php'
+                target.unlink()
+                # Hard links exercise unlink safety without Windows symlink privileges.
+                os.link(outside, target)
+            return completed
+
+        with patch.object(self, 'fake_docker', side_effect=swap_target):
+            summary, _ = self.checked()
+        self.assertEqual(outside.read_bytes(), b'KEEP')
+        self.assertEqual(summary['result'], 'clean')
+
+    def test_review_G28_frozen_commit_ignores_dirty_and_export_ignored_files(self):
+        (self.repo / '.gitattributes').write_text('cart.php export-ignore\n')
+        self.freeze()
+        self.source.write_bytes(b'DIRTY')
+        (self.repo / 'untracked.txt').write_text('UNTRACKED')
+        transport = self.fake_docker
+        copied_untracked = []
+
+        def inspect_copy(argv, **kwargs):
+            if argv[:2] == ['docker', 'run']:
+                copied_untracked.append((Path(kwargs['cwd']) / 'untracked.txt').exists())
+            return transport(argv, **kwargs)
+
+        with patch.object(self, 'fake_docker', side_effect=inspect_copy):
+            summary, report = self.checked('--head', self.head)
+        self.assertEqual(summary['result'], 'clean')
+        self.assertEqual(report['head'], self.head)
+        steps = report['tests'][0]['steps']
+        self.assertEqual(steps[1]['stdout'].strip(), 'GREEN')
+        self.assertEqual(steps[-1]['parsed']['state'], 'ok')
+        self.assertEqual(self.source.read_bytes(), b'DIRTY')
+        self.assertEqual(copied_untracked, [False] * 5)
+
+    def test_review_G29_rebuild_removes_caches_before_green_and_next_pick(self):
+        self.spec['tests'] = [self.pick(), self.pick()]
+        (self.repo / 'config.txt').write_text('FROZEN')
+        self.freeze()
+        transport = self.fake_docker
+
+        def cache_fault(argv, **kwargs):
+            if argv[:2] != ['docker', 'run']:
+                return transport(argv, **kwargs)
+            copy = Path(kwargs['cwd'])
+            number = int(argv[argv.index('--name') + 1].rsplit('-', 1)[1])
+            cache = copy / 'fault-cache'
+            if number in (5, 6, 10) and (cache.exists() or (copy / 'config.txt').read_text() != 'FROZEN'):
+                return subprocess.CompletedProcess(argv, 2, 'Fatal error: stale cache', '')
+            completed = transport(argv, **kwargs)
+            if number in (4, 9):
+                cache.write_text('FAULT')
+                (copy / 'config.txt').write_text('FAULT')
+            if number == 5:
+                cache.write_text('baseline cache')
+            return completed
+
+        with patch.object(self, 'fake_docker', side_effect=cache_fault):
+            summary, report = self.checked()
+        self.assertEqual(summary['result'], 'clean')
+        self.assertEqual([test['steps'][0]['parsed']['state'] for test in report['tests']],
+                         ['ok', 'ok'])
+        self.assertEqual([test['steps'][-1]['parsed']['state'] for test in report['tests']],
+                         ['ok', 'ok'])
+
+    def test_review_G30_sleeping_runner_is_stopped_and_step_is_recorded(self):
+        sleeper = self.root / 'sleeper.py'
+        sleeper.write_text("import time\ntime.sleep(0.2)\nprint('OK (1 test, 1 assertion)')\n")
+        stopped = []
+
+        def sleepy_docker(argv, **kwargs):
+            if argv[:2] == ['docker', 'stop']:
+                stopped.append(argv[-1])
+                return subprocess.CompletedProcess(argv, 0, '', '')
+            if argv[:2] == ['docker', 'run']:
+                return self.real_run([sys.executable, '-B', str(sleeper)], **kwargs)
+            return self.real_run(argv, **kwargs)
+
+        runner = check11_run.Runner(self.repo, 'fixture:image')
+        runner.timeout = 0.03
+        with patch.object(check11_run.subprocess, 'run', side_effect=sleepy_docker):
+            with self.assertRaisesRegex(ValueError, 'probe_before timed out'):
+                runner.run('probe_before', 'sleep fixture')
+        self.assertEqual(stopped, [runner.steps[0]['argv'][runner.steps[0]['argv'].index('--name') + 1]])
+        self.assertTrue(stopped[0].startswith('actas-t36-'))
+        self.assertTrue(runner.steps[0]['timed_out'])
+
+    def test_review_G30_each_timed_out_step_makes_the_pick_not_checked(self):
+        sleeper = self.root / 'sleeper.py'
+        sleeper.write_text('import time\ntime.sleep(0.2)\n')
+        transport = self.fake_docker
+        # Boundaries: green, both probes, fault run, final green; invalid limits below.
+        for number, step in enumerate(['start', 'probe_before', 'probe_after',
+                                       'fault_run', 'green_again'], 1):
+            stopped = []
+
+            def timed_docker(argv, **kwargs):
+                if argv[:2] == ['docker', 'stop']:
+                    stopped.append(argv[-1])
+                    return subprocess.CompletedProcess(argv, 0, '', '')
+                if argv[:2] == ['docker', 'run']:
+                    if argv[argv.index('--name') + 1].endswith(f'-{number}'):
+                        return self.real_run([sys.executable, '-B', str(sleeper)], **kwargs)
+                    kwargs.pop('timeout', None)
+                return transport(argv, **kwargs)
+
+            with self.subTest(step=step), patch.object(self, 'fake_docker', side_effect=timed_docker):
+                summary, report = self.checked('--timeout', '0.03')
+                self.assertEqual(summary['result'], 'not checked')
+                picked = report['tests'][0]
+                self.assertEqual(picked['reason'], f'{step} timed out')
+                failed = next(s for s in picked['steps'] if s.get('timed_out'))
+                self.assertEqual(stopped, [failed['argv'][failed['argv'].index('--name') + 1]])
+                self.assertTrue(stopped[0].startswith('actas-t36-'))
+                self.assertFalse(Path(failed['cwd']).exists())
+
+    def test_required_head_and_invalid_image_or_timeout_refuse_before_running(self):
+        for args, message in [(('--head', 'missing-commit'), 'git failed'),
+                              (('--image', ''), '--image'),
+                              *[(('--timeout', limit), '--timeout')
+                                for limit in ['0', '-1', 'nan', 'inf']]]:
+            with self.subTest(args=args):
+                self.assert_bad(self.cli(*args), message)
+                self.assertEqual(self.docker_calls, [])
 
 
 if __name__ == '__main__':

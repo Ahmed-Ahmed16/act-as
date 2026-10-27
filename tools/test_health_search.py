@@ -124,6 +124,31 @@ class HealthSearchTests(unittest.TestCase):
                          in_lang=False, in_test=False)])
                 self.git('checkout', 'main')
 
+    def test_acme_g18_existing_file_counts_only_extra_copies_as_new(self):
+        # G18 cases: added copies, unchanged copies, fewer copies, no copies.
+        cases = [(1, 2, 1, 1, [True, False], 'finding'),
+                 (2, 4, 2, 2, [True, True, False, False], 'finding'),
+                 (2, 2, 0, 2, [True, True], 'clean'),
+                 (2, 1, 0, 1, [True], 'clean'),
+                 (1, 0, 0, 0, [], 'clean')]
+        for base_count, head_count, new, old, at_base, result in cases:
+            with self.subTest(base=base_count, head=head_count):
+                self.write('app/Card.php', '5120\n' * base_count)
+                base = self.commit()
+                self.write('app/Card.php', 'Acme\n' + '5120\n' * head_count)
+                document = self.copies(base, self.commit(), '5120')
+                summary = document['summary'][0]
+                self.assertEqual(summary['new_copies'], new)
+                self.assertEqual(summary['old_copies'], old)
+                self.assertEqual(summary['copy_count'], head_count)
+                self.assertEqual(summary['result'], result)
+                self.assertEqual(document['result'], result)
+                self.assertEqual(summary.get('old_only', False), head_count == 2 and new == 0)
+                copies = document['literals'][0]['copies']
+                self.assertEqual([row['at_base'] for row in copies], at_base)
+                self.assertEqual([row['line'] for row in copies],
+                                 list(range(2, head_count + 2)))
+
     def test_acme_touching_old_copy_is_clean_with_old_only(self):
         for path in ('app/Card.php', 'app/Acme.php'):
             self.write(path, '5120\n')
