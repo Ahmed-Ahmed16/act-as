@@ -132,10 +132,35 @@ def receiver_context(tokens, opening, openings):
     return [token for token, _ in tokens[max(0, index):opening]]
 
 
-def scan_file(path, relative):
-    text = path.read_text(encoding='utf-8-sig')
-    masked = TOKEN.sub(lambda match: blank(match) if match.group().startswith(('//', '#', '/*', '{{--', '<!--')) else match.group(), text)
-    tokens = [(match.group(), match.start()) for match in TOKEN.finditer(masked)]
+def blade_sources(text):
+    # Cases: quoted/unquoted echoes, nested @lang, comments, unfinished calls.
+    text = re.sub(r'\{\{--.*?--\}\}|<!--.*?-->', blank, text, flags=re.S)
+    sources, spans = [], []
+    for match in re.finditer(r'\{\{|\{!!|@lang\s*\(', text):
+        start, end = match.span()
+        if spans and start < spans[-1][1]:
+            continue
+        if match.group().startswith('@lang'):
+            tokens = [(token.group(), token.start()) for token in TOKEN.finditer(text, start)]
+            _, closing = arguments(tokens, 2)
+            if closing == 2:
+                continue
+            end = tokens[closing][1] + 1
+        else:
+            closing = '}}' if match.group() == '{{' else '!!}'
+            end = next((token.start() + len(closing) for token in TOKEN.finditer(text, end)
+                        if text.startswith(closing, token.start())), None)
+            if end is None:
+                continue
+        sources.append((text[start:end], start))
+        spans.append((start, end))
+    # Remove extracted bodies so normal Blade text is never counted twice.
+    for start, end in reversed(spans):
+        text = text[:start] + re.sub(r'[^\n]', ' ', text[start:end]) + text[end:]
+    return [(text, 0), *sources]
+
+
+def scan_tokens(tokens, text, relative):
     calls, visible, directives, translation_end, openings = [], set(), [], -1, {}
     for index, (token, position) in enumerate(tokens):
         if token != '(':
@@ -157,7 +182,24 @@ def scan_file(path, relative):
                 visible.add(f'{relative}:{line}')
         if context[-2:-1] == ['@']:
             directives.append((tokens[index - 2][1], tokens[end][1] + 1))
-    raw, blade_visible = blade_pointers(text, calls, directives, relative) if path.name.endswith('.blade.php') else ([], set())
+    return calls, visible, directives
+
+
+def scan_file(path, relative):
+    text = path.read_text(encoding='utf-8-sig')
+    blade = path.name.endswith('.blade.php')
+    sources = blade_sources(text) if blade else [(text, 0)]
+    calls, visible, directives = [], set(), []
+    for source, offset in sources:
+        masked = TOKEN.sub(lambda match: blank(match) if match.group().startswith(('//', '#', '/*', '{{--', '<!--')) else match.group(), source)
+        tokens = [(match.group(), match.start() + offset) for match in TOKEN.finditer(masked)]
+        source_calls, source_visible, source_directives = scan_tokens(tokens, text, relative)
+        calls.extend(source_calls)
+        visible.update(source_visible)
+        directives.extend(source_directives)
+    calls.sort(key=lambda call: call['position'])
+    directives.sort()
+    raw, blade_visible = blade_pointers(text, calls, directives, relative) if blade else ([], set())
     return calls, raw, visible | blade_visible
 
 

@@ -7,6 +7,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from translation_health_scan import scan_file
 
 
 class TranslationHealthTests(unittest.TestCase):
@@ -97,6 +98,41 @@ class TranslationHealthTests(unittest.TestCase):
             dict(key='absent.key', locales_missing=['ar', 'en'], used_at=['app/Parcel.php:2']),
             dict(key='orders.title', locales_missing=['ar'],
                  used_at=['app/Parcel.php:1', 'app/Parcel.php:3'])])
+
+    def test_blade_attribute_calls_report_missing_keys_and_used_keys(self):
+        # N9: HTML quotes must not hide any of the 3 Blade forms.
+        for expression in ("{{ __('KEY') }}", "{!! trans('KEY') !!}", "@lang('KEY')"):
+            for quote in ('"', "'"):
+                with self.subTest(expression=expression, quote=quote):
+                    self.write('resources/views/cart.blade.php', '\n'.join([
+                        '<input',
+                        ' title=' + quote + expression.replace('KEY', 'orders.hello') + quote,
+                        ' placeholder=' + quote + expression.replace('KEY', 'missing.attribute') + quote + '>',
+                    ]))
+                    report = self.report()
+                    self.assertEqual(report['check2'], [dict(
+                        key='missing.attribute', locales_missing=['ar', 'en'],
+                        used_at=['resources/views/cart.blade.php:3'])])
+                    self.assertEqual(report['check6'], dict(
+                        variable=[], no_trace=['Save', 'orders.count'], dynamic_call_sites=[]))
+
+    def test_blade_attribute_and_text_calls_are_each_found_once(self):
+        for expression in ("{{ __('orders.hello') }}", "{!! __('orders.hello') !!}",
+                           "{{ __('orders.hello', ['name' => '}}']) }}",
+                           "{!! __('orders.hello', ['name' => '!!}']) !!}",
+                           "@lang('orders.hello')",
+                           '''@lang('orders.hello', ['name' => "@lang('fake.string')"])'''):
+            with self.subTest(expression=expression):
+                source = '\n'.join([
+                    '{{-- <input title="' + expression + '"> --}}',
+                    '<input title="' + expression + '">',
+                    '<!-- <input title="' + expression + '"> -->',
+                    '<p>' + expression + '</p>',
+                ])
+                path = self.write('resources/views/cart.blade.php', source)
+                calls, _, _ = scan_file(path, 'resources/views/cart.blade.php')
+                self.assertEqual(sorted((call['key'], call['line']) for call in calls),
+                                 [('orders.hello', 2), ('orders.hello', 4)])
 
     def test_placeholders_come_from_report_and_count_is_ignored(self):
         self.assertEqual(self.report()['check3'], [])

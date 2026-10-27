@@ -23,6 +23,8 @@ from pathlib import Path
 
 TOKEN = re.compile(r'''\s+|//[^\n]*|\#[^\n]*|/\*.*?\*/|<\?php\b|\?>|=>|'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*"|[+-]?\d+|[\w\\]+|.''', re.S)
 PLACEHOLDER = re.compile(r'(?<![\w:]):[A-Za-z_][A-Za-z0-9_]*')
+# Backslash pairs leave the dollar unescaped; an odd backslash escapes it.
+INTERPOLATION = re.compile(r'(?<!\\)(?:\\\\)*\$(?:[A-Za-z_\x80-\uffff]|\{)')
 LETTER_SCRIPTS = {'ar': 'ARABIC', 'en': 'LATIN'}
 
 
@@ -108,7 +110,8 @@ class PhpArray:
                 self.skip_expression(closing)
                 token = self.tokens[start]
                 leaves[key] = (php_key(token) if self.position == start + 1
-                               and token.startswith(("'", '"')) else None)
+                               and token.startswith(("'", '"'))
+                               and not (token.startswith('"') and INTERPOLATION.search(token)) else None)
             if self.peek() == closing:
                 break
             self.expect(',')
