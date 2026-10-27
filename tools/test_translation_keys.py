@@ -85,6 +85,29 @@ class TranslationKeyTests(unittest.TestCase):
         self.assertEqual([(gap['key'], gap['file']) for gap in gaps],
                          [('sector/ledger.title', 'sector/ledger.php'), ('zora.outer.inner.leaf', 'zora.php')])
 
+    def test_php_lists_use_automatic_integer_keys(self):
+        cases = [
+            ("['days' => ['Monday', 'Tuesday']]", ['days.0', 'days.1']),
+            ("array('days' => array('Monday', 'Tuesday',))", ['days.0', 'days.1']),
+            ("['days' => ['Monday', 4 => 'Tuesday', 2 => 'Wednesday', 'Thursday']]",
+             ['days.0', 'days.2', 'days.4', 'days.5']),
+            ("['days' => ['4' => 'Monday', 'Tuesday', 'label' => 'Wednesday', 'Thursday']]",
+             ['days.4', 'days.5', 'days.6', 'days.label']),
+            ("['days' => ['04' => 'Monday', '+4' => 'Tuesday', 'Wednesday']]",
+             ['days.+4', 'days.0', 'days.04']),
+            ("['days' => [['Monday'], ['Tuesday']]]", ['days.0.0', 'days.1.0']),
+            ("['days' => [-3 => 'Monday', 'Tuesday']]", ['days.-2', 'days.-3']),
+        ]
+        self.write('ar/messages.php', '<?php return [];')
+        for source, keys in cases:
+            with self.subTest(source=source):
+                self.write('en/messages.php', '<?php return ' + source + ';')
+                self.assertEqual(self.entries(), [
+                    dict(key='messages.' + key, shape='php', file='messages.php',
+                         locales_with=['en'], locales_missing=['ar'], touched_by_pr='no')
+                    for key in keys
+                ])
+
     def test_discovery_includes_json_and_folder_only_locales(self):
         self.write('ava.json', '{"luma": "A"}')
         self.write('bex.json', '{}')
@@ -93,6 +116,13 @@ class TranslationKeyTests(unittest.TestCase):
         self.assertEqual([(gap['key'], gap['locales_with'], gap['locales_missing']) for gap in gaps],
                          [('luma', ['ava'], ['bex', 'cyv']), ('zora.title', ['cyv'], ['ava', 'bex'])])
 
+    def test_vendor_package_translations_do_not_create_locale_or_gaps(self):
+        self.write('en/messages.php', "<?php return ['title' => 'A'];")
+        self.write('ar/messages.php', '<?php return [];')
+        self.write('vendor/pkg/en/p.php', "<?php return ['package' => 'B'];")
+        self.assertEqual(self.entries(), [dict(key='messages.title', shape='php', file='messages.php',
+                                             locales_with=['en'], locales_missing=['ar'], touched_by_pr='no')])
+
     def test_changed_files_both_formats_mark_gaps_without_filtering(self):
         self.write('ava.json', '{"luma": "A"}')
         self.write('bex.json', '{}')
@@ -100,6 +130,9 @@ class TranslationKeyTests(unittest.TestCase):
         self.write('bex/sector/ledger.php', '<?php return [];')
         changes = self.root / 'files.json'
         cases = [(['repo/lang/ava.json'], ['yes', 'no']),
+                 (['lang/ava.json'], ['yes', 'no']),
+                 (['ava.json'], ['yes', 'no']),
+                 (['app/ava.json'], ['no', 'no']),
                  ([{'path': r'repo\lang\bex\sector\ledger.php'}], ['no', 'yes']),
                  ([{'filename': 'repo/lang/ava/sector/ledger.php'}], ['no', 'yes']),
                  (['sector/ledger.php'], ['no', 'yes']),
@@ -110,6 +143,31 @@ class TranslationKeyTests(unittest.TestCase):
                 gaps = self.entries('--changed-files', changes)
                 self.assertEqual([gap['touched_by_pr'] for gap in gaps], expected)
                 self.assertEqual([gap['key'] for gap in gaps], ['luma', 'sector/ledger.title'])
+
+    def test_changed_translation_paths_do_not_touch_suffix_matches(self):
+        for group in ['messages.php', 'admin/messages.php']:
+            self.write('en/' + group, "<?php return ['title' => 'A'];")
+            self.write('ar/' + group, '<?php return [];')
+        changes = self.root / 'files.json'
+        cases = [
+            ('lang/en/admin/messages.php', ['yes', 'no']),
+            ('app/messages.php', ['no', 'no']),
+            ('lang/en/messages.php', ['no', 'yes']),
+            ('en/messages.php', ['no', 'yes']),
+            ('messages.php', ['no', 'yes']),
+            ('en/admin/messages.php', ['yes', 'no']),
+            ('admin/messages.php', ['yes', 'no']),
+            ('repo/lang/ar/admin/messages.php', ['yes', 'no']),
+            ('repo/lang/ar/messages.php', ['no', 'yes']),
+            ('app/en/messages.php', ['no', 'no']),
+            ('lang/other/messages.php', ['no', 'no']),
+            ('lang/en/messages.php.bak', ['no', 'no']),
+        ]
+        for path, expected in cases:
+            with self.subTest(path=path):
+                changes.write_text(json.dumps([path]), encoding='utf-8')
+                self.assertEqual([gap['touched_by_pr'] for gap in self.entries('--changed-files', changes)],
+                                 expected)
 
     def test_php_tokenizer_counts_keys_without_evaluating_values(self):
         self.write('ava/zora.php', r'''<?php
