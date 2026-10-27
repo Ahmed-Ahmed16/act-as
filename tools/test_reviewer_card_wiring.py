@@ -150,6 +150,16 @@ class RealReviewerWiringTests(unittest.TestCase):
                                  f'cards.py reviewer business {step}: {len(expected[step])} printed, 0 skipped')
                 self.assertEqual(re.findall(r'^== (REV-\w+) \|', run.stdout, re.MULTILINE), expected[step])
 
+    def test_question_12_loads_only_in_its_pointer_step(self):
+        # B23: question 12 is not in the default 16; only step 21 loads its card.
+        listed = re.compile(r'^== (REV-\w+) \|', re.MULTILINE)
+        default = run_gate('reviewer', 'health', '18')
+        self.assertEqual(default.returncode, 0, default.stdout + default.stderr)
+        self.assertNotIn('REV-512', listed.findall(default.stdout))
+        pointer = run_gate('reviewer', 'health', '21')
+        self.assertEqual(pointer.returncode, 0, pointer.stdout + pointer.stderr)
+        self.assertEqual(listed.findall(pointer.stdout), ['REV-512'])
+
     def test_a_rerun_step_number_that_does_not_exist_is_refused(self):
         run = run_gate('reviewer', 'business', '26')
         self.assertEqual(run.returncode, 2, run.stdout + run.stderr)

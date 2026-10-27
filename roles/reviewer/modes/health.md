@@ -87,8 +87,7 @@ Before each step, run `cards.py reviewer health <step number>`, for example
    route lines per touched controller. The count is a pointer and never a
    finding. 10 or more route lines on 1 controller make a pointer (the script
    sets `pointer`); 9 or fewer do not. The pointer
-   sends you to questions 11 and 13 (until the question 12 card can load; then
-   12 and 13). A `Route::resource` line counts as 1 line but is many routes;
+   sends you to questions 12 and 13 (step 21 loads the question 12 card). A `Route::resource` line counts as 1 line but is many routes;
    say so. Reading: questions 11, 12 and 13.
    Route count card: `REV-407`.
 6. **H4 Logic or queries in controllers.** Tool: search the changed controllers
@@ -254,10 +253,9 @@ Before each step, run `cards.py reviewer health <step number>`, for example
     3 jobs (question 17)". A guard finding that is not a number stays a
     finding. A pointer never passes or fails health. The pointer map:
     a long new method, question 6; a small change inside a method that is
-    already long, question 17; a long class, questions 12 and 11 (11 alone
-    until the question 12 card loads); many routes on 1 controller, questions
-    11 and 13 until the question 12 card loads, then 12 and 13; a copy,
-    question 18.
+    already long, question 17; a long class, questions 12 and 11; many routes
+    on 1 controller, questions 12 and 13; a copy, question 18. Question 12
+    loads only through step 21.
     Pointer judgement cards: `REV-449`, `REV-450`.
 18. **The review questions.** Ask these 16 on every run, and answer each with
     1 line and a file:line, or "nothing to say":
@@ -286,15 +284,15 @@ Before each step, run `cards.py reviewer health <step number>`, for example
     needs a record of old behaviour and proof) when the PR is a refactor or
     cleanup. Ask question 32 (docs updated when behaviour or setup changed)
     when the `docs-guard` trigger fires, and also when the PR adds behaviour
-    that no document mentions. Question 12 (one actor per class)
-    joins only when its card loads from `cards.py`; if it does not load, do not
-    ask it. Questions 14 and 19 are not asked in v1 (open). Questions 24 to 29
+    that no document mentions. Question 12 (one actor per class) is not 1 of
+    the 16. Ask it only when the pointer map in step 17 sends you there, and
+    then run step 21 to load its card. Questions 14 and 19 are not asked in v1 (open). Questions 24 to 29
     belong to size and the packet; question 30 belongs to security. A design
     opinion with no shown harm is a pointer, never a finding.
     Default question cards: `REV-501` to `REV-504`, `REV-507`, `REV-508`,
     `REV-510`, `REV-511`, `REV-513` to `REV-518`, `REV-520`, `REV-521`.
-    Conditional question cards: `REV-505`, `REV-506`, `REV-509`, `REV-512`,
-    `REV-519`, `REV-522`, `REV-523`.
+    Conditional question cards: `REV-505`, `REV-506`, `REV-509`, `REV-519`,
+    `REV-522`, `REV-523`.
 19. **Cost to add and verdict.** Write `runs/check-record.json` with an entry
     for H1 to H11 and T1 to T8, using their tool and reading results.
     Run `python tools/health_verdict.py --record runs/check-record.json`.
@@ -323,6 +321,12 @@ Before each step, run `cards.py reviewer health <step number>`, for example
     not sent; never send it. Run `python tools/packet_check.py <packet folder>`
     after the last write and show the packet only after `packet_check: pass`
     (`REV-P08`). Save the end snapshot and compare it with the start one.
+21. **Question 12, only on a pointer.** Run this step only when the pointer
+    map in step 17 sends you to question 12: a long class, or many routes on
+    1 controller. Never run it on its own. Ask question 12 (one actor per
+    class) for that class or controller only, and answer it like the other
+    questions.
+    Question 12 card: `REV-512`.
 
 ## Guard skills and debate-review (ticket 37)
 
