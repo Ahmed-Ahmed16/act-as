@@ -9,8 +9,8 @@ Before each step, run `cards.py developer build <step number>`, for example
 
 1. **Read the ground.** The repo's agent files and the architecture doc
    (`DEV-P04`). Done when the files the change will touch are named.
-2. **Plan.** Split the work into patches of 300 changed lines or fewer, tests
-   not counted (`DEV-P01`). Say which patches go to a delegate, if any.
+2. **Plan.** Split the work into patches of 300 changed lines or fewer, tests,
+   lock files, generated files and docs not counted (`DEV-P01`). Say which patches go to a delegate, if any.
 3. **Test first.** For each patch, write a test for the new behaviour and see
    it fail (`DEV-P02`).
 4. **Build.** Write the patch, or check the delegate's diff against the plan.

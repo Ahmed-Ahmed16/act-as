@@ -69,13 +69,14 @@ source, and when it applies.
 Cards for every mode:
 None yet.
 
-`cards.py reviewer --audit` prints only skipped step and common cards, so it covers no policy card; the policy step is what covers them.
+`cards.py reviewer --audit` lists only skipped step cards and common cards. It lists no policy card. The policy step is what covers those.
 
 ## 4. Skills this role reaches for
 
 Use what is installed. A missing one: say 'not checked: <skill> not installed'
-and work without it. These are wired in by later work; until then they are
-not run.
+and work without it. Health mode runs the 3 guard skills (step 2 of its
+guard block) and saves their output under `runs/`. A full run also runs
+`debate-review`.
 
 | Skill or tool | When | Stop point |
 | --- | --- | --- |

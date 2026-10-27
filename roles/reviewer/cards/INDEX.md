@@ -169,7 +169,7 @@ carry `docs_version`, `checked_same` and `differs_on`.
 
 ## Health check cards
 
-Drafted 2026-10-27 by claude-sonnet-5-5 (ticket 47), fixed 2026-10-27 after the claude-opus-5-5 check. Approved by the owner on 2026-10-27 (spec amendments B16 and B17). The check map below names the main card for each approved check. Check id: H1 to H11 are the health checks; "(part)" marks a further card of the same check; HL is a named Laravel reading prompt; L2 to L4 are the named reading steps; G1, G2 and G5 are the spec's gap items; "none" is a rule shared by several checks.
+Drafted 2026-10-27 by claude-sonnet-5-5 (ticket 47), fixed 2026-10-27 after the claude-opus-5-5 check. Approved by the owner on 2026-10-27 (spec amendments B16 and B17). The check map below names the main card for each approved check. Check id values: H1 to H11 are the health checks. "(part)" marks a further card of the same check. HL is a named Laravel reading prompt. L2 to L4 are the named reading steps. G1, G2 and G5 are the spec's gap items. "none" is a rule shared by several checks.
 
 406 merged into 449 (the line count of a changed file is a pointer, like every tool number). REV-406 does not exist.
 
@@ -230,9 +230,9 @@ Drafted 2026-10-27 by claude-sonnet-5-5 (ticket 47), fixed 2026-10-27 after the 
 Drafted 2026-10-27. Approved by the owner on 2026-10-27
 (spec amendments B16 and B17). Their check ids name the main cards in the
 check map below. Question 12 is NOT in the default set: it is
-Ahmed's choice, and the spec leaves the count after it joins open.
-Questions 14 and 19 have no card (open point O4). Questions 24 to 29 belong
-to size and the packet, and question 30 to security.
+Ahmed's choice. The spec has not said how many questions there will be once
+it joins. Questions 14 and 19 have no card (open point O4). Questions 24 to
+29 belong to size and the packet. Question 30 belongs to security.
 
 | id | mode | trigger | status | check id | rule in short |
 | --- | --- | --- | --- | --- | --- |
@@ -262,7 +262,7 @@ to size and the packet, and question 30 to security.
 
 ## Translation check cards
 
-Drafted 2026-10-27 by claude-sonnet-5-5 (ticket 49), checked and rechecked by claude-opus-5-5, approved by Ahmed 2026-10-27 (spec B19). T1 to T8 map to REV-601 to REV-608 in the check map below. Check id: T1 to T8 are the translation checks; G4 is the spec's user visible text pointer; "facts" are the English text as key facts; "layout" is the layout pointer.
+Drafted 2026-10-27 by claude-sonnet-5-5 (ticket 49), checked and rechecked by claude-opus-5-5, approved by Ahmed 2026-10-27 (spec B19). T1 to T8 map to REV-601 to REV-608 in the check map below. Check id values: T1 to T8 are the translation checks. G4 is the spec's user visible text pointer. "facts" are the English text as key facts. "layout" is the layout pointer.
 
 | id | mode | trigger | status | check id | rule in short |
 | --- | --- | --- | --- | --- | --- |

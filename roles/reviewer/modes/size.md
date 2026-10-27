@@ -15,12 +15,12 @@ Before each step, run `cards.py reviewer size <step number>`, for example
 
 1. **Freeze.** Run the Laravel check from ROLE.md first. Then write down the
    full PR head commit, the full head commit of the PR's base branch, and
-   the comparison base. Rule: `REV-P10`. One base serves every comparison;
-   never pick another later. Open PR: the comparison base is the merge base
+   the comparison base. Rule: `REV-P10`. One base serves every comparison.
+   Never pick another later. Open PR: the comparison base is the merge base
    of the base branch head and the PR head. Merged PR: the base is the one
    GitHub recorded for the PR (`gh pr view <n> --json baseRefOid`), used
-   with the proved command in step 3. If that call fails or its answer
-   cannot be checked, the base is not proved: write
+   with the proved command in step 3. If that call fails, or you cannot
+   check its answer, the base is not proved. Write
    `not checked: PR already merged, base not proved` as the size line,
    stop, and make no count.
    Comparison base and head cards: `REV-114` to `REV-118`.
@@ -46,18 +46,23 @@ Before each step, run `cards.py reviewer size <step number>`, for example
    packet in step 5. Size line and over the cap cards: `REV-108`, `REV-109`.
    REV-109 is background on the cap; a size run writes no split request.
 5. **Write the packet.** (Over the cap: use the changes at the end of this
-   step.) File `packet.md` in the packet folder, in the
-   packet format the packet check reads. Identity line with `mode=size`. The
-   size line from step 4. The business, security and health lines each say
-   `not asked: size run only`. The money line says
-   `not checked: money not looked at, size run only`. Tests run says
-   `not asked: size run only`. Split plan says
-   `not needed: <n> counted lines, cap 300`. Every other field has real
-   content: Behaviour changed (what the PR changes, in plain words, read
-   from the diff), Files that matter most (path plus one line why), Not
-   checked (a reason on every line, and at least the other three modes),
-   Known risks and Pointers (`none` is allowed), Drafts, not sent (the
-   message to the author, never sent). Write the 3 other saved inputs beside
+   step.) Write `packet.md` in the packet folder, in the packet format the
+   packet check reads. Fill the fields like this:
+   - Identity line: `mode=size`.
+   - Size line: the line from step 4.
+   - Business, security and health lines: each says `not asked: size run only`.
+   - Money line: `not checked: money not looked at, size run only`.
+   - Tests run: `not asked: size run only`.
+   - Split plan: `not needed: <n> counted lines, cap 300`.
+   - Every other field has real content:
+     - Behaviour changed: what the PR changes, in plain words, read from the
+       diff.
+     - Files that matter most: the path plus 1 line on why.
+     - Not checked: a reason on every line, and at least the other 3 modes.
+     - Known risks and Pointers: `none` is allowed.
+     - Drafts, not sent: the message to the author, never sent.
+
+   Write the 3 other saved inputs beside
    `packet.md` as these empty objects: `check-record.json`:
    `{"required_ids": [], "entries": []}`; `split-plan.json`:
    `{"groups": [], "first_group_parts": [], "unplaced": []}`;
@@ -75,8 +80,8 @@ Before each step, run `cards.py reviewer size <step number>`, for example
    `group:` line anywhere, in Split plan or in Drafts, not sent. Drafts, not
    sent says `not asked: size run only`. `split-plan.json` stays
    `{"groups": [], "first_group_parts": [], "unplaced": []}`.
-   Nothing in the packet says the PR is fine or safe;
-   say plainly that it is over the cap and was only counted.
+   Nothing in the packet says the PR is fine or safe.
+   Say plainly that it is over the cap and was only counted.
 
 6. **Packet check.** Run `python tools/packet_check.py <packet folder>`
    after the last write to the packet. Exit 0 prints `packet_check: pass`.
