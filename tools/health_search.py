@@ -50,9 +50,9 @@ def occurrences(repo, ref, literal):
 
 
 def copies(args):
-    if any(len(literal) < 3 or '\n' in literal or '\r' in literal or '\0' in literal
+    if any(not literal or '\n' in literal or '\r' in literal or '\0' in literal
            for literal in args.literal):
-        raise ValueError('literal must have at least 3 characters on 1 line')
+        raise ValueError('literal must be nonempty and on 1 line')
     refs = [git(args.repo, 'rev-parse', '--verify', '--end-of-options', ref + '^{commit}')
             .decode('ascii').strip() for ref in (args.base, args.head)]
     literals, summaries = [], []
