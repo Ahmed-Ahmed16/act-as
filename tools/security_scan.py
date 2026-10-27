@@ -53,9 +53,29 @@ def redact(text):
     return text
 
 
+def redact_strings(document):
+    if isinstance(document, str):
+        return redact(document)
+    if isinstance(document, list):
+        return [redact_strings(entry) for entry in document]
+    if isinstance(document, dict):
+        return {key: redact_strings(entry) for key, entry in document.items()}
+    return document
+
+
+def redact_output(text):
+    try:
+        return json.dumps(redact_strings(json.loads(text)), indent=2)
+    except json.JSONDecodeError:
+        # Broken or truncated JSON cannot reliably delimit an assigned value.
+        return '\n'.join(re.sub(r'''(=\s*)\\*["'].*''',
+                               r'\1[redacted]', redact(line))
+                         for line in text.splitlines())
+
+
 def save_json(path, report):
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(redact(json.dumps(report, indent=2)) + '\n', encoding='utf-8')
+    path.write_text(json.dumps(redact_strings(report), indent=2) + '\n', encoding='utf-8')
 
 
 def paths(filename):
@@ -125,7 +145,7 @@ def finders(options):
             ('S21', 'path:dependency_manifest', path in ('composer.json', 'composer.lock', 'package.json', 'package-lock.json'))]:
             if applies:
                 hits.append(dict(check=check, pattern=pattern, side=side, path=path, line=0, text=''))
-        if path.endswith(('.php', '.env.example', '.json', '.js', '.yml', '.yaml')) or path == 'composer.lock':
+        if path.endswith(('.php', '.phtml', '.tpl', '.env.example', '.json', '.js', '.yml', '.yaml')) or path == 'composer.lock':
             hits.extend(patch_hits(path, patch))
     return dict(files=files, hits=hits)
 
@@ -149,8 +169,10 @@ def container(tool, mounts):
 def raw_output(out, tool, completed):
     stdout = completed.stdout.decode('utf-8', 'replace')
     stderr = completed.stderr.decode('utf-8', 'replace')
-    safe = '\n'.join(line for line in (stdout + '\n' + stderr).splitlines() if not line.lstrip().startswith('Secret:'))
-    (out / f'{tool}-raw.txt').write_text(redact(safe)[-16000:], encoding='utf-8')
+    mask = redact_output if tool == 'semgrep' else redact
+    safe = '\n'.join(line for line in (mask(stdout) + '\n' + mask(stderr)).splitlines()
+                     if not line.lstrip().startswith('Secret:'))
+    (out / f'{tool}-raw.txt').write_text(safe[-16000:], encoding='utf-8')
     return stdout
 
 
@@ -189,7 +211,7 @@ def semgrep(options, mounts, selected, runner):
             ['--network', 'none', '-e', 'SEMGREP_ENABLE_VERSION_CHECK=0', '-w', '/src', options.image,
              'semgrep', 'scan', '--metrics=off', '--disable-version-check', '--config', '/rules', '--json', '--error', '--', *selected], runner)
         stdout = raw_output(options.out, 'semgrep', completed)
-        (options.out / 'semgrep-raw.json').write_text(redact(stdout), encoding='utf-8')
+        (options.out / 'semgrep-raw.json').write_text(redact_output(stdout), encoding='utf-8')
         if completed.returncode not in (0, 1):
             return unchecked('semgrep', f'exit {completed.returncode}', completed.returncode)
         try:
