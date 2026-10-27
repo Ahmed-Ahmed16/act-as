@@ -34,7 +34,7 @@ check map below; the others are rules of the size step.
 | REV-108 | size, full | When writing the size line | approved | none | The size line shows verdict, counted lines, cap and what was left out by kind. |
 | REV-109 | size, full | When a PR is over the 300 line cap | approved | Q26 | An over the cap PR goes back with a request to split it. |
 | REV-110 | size, full | When choosing the reading order of a PR | approved | Q25 | Tests may be read first; no fixed order. |
-| REV-111 | size, full | When reading the list of changed files | approved | Q27 | Name a file unrelated to the stated task as a lead; it only sets the reading order. |
+| REV-111 | size, security, full | When reading the list of changed files | approved | Q27 | Name a file unrelated to the stated task as a lead; it only sets the reading order. |
 | REV-112 | size, full | When proposing or judging a split into parts | approved | Q28 | Each part of a split builds and passes its own tests. |
 | REV-113 | size, full | When reading the PR description | approved | Q29 | Check the description says what was checked, skipped, and the risks. |
 | REV-114 | all | When freezing the comparison base of an open PR | approved | none | Base is the merge base of the PR head and the base branch head. |
@@ -50,10 +50,10 @@ primary source, only community posts.
 
 ## Business step cards
 
-Drafted 2026-10-27 for ticket 45. All drafts: a different model checks them against the raw
-source, then Ahmed approves. Business has no check id in the check map, so the
+Drafted 2026-10-27 for ticket 45. Approved by the owner on 2026-10-27
+(spec amendments B16 and B17). Business has no check id in the check map, so the
 check id column says none. The step column says where each card belongs in the business mode
-file (a number is a step of `## Steps`; `rerun` has no step number yet, see the report).
+file (a number is a step of `## Steps`; `rerun` uses steps 20 to 25).
 
 | id | mode | trigger | status | check id | step | rule in short |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -99,9 +99,10 @@ file (a number is a step of `## Steps`; `rerun` has no step number yet, see the 
 ## Security check cards
 
 Drafted by claude-sonnet-5-5 on 2026-10-27 for ticket 46, fixed the same day
-after the claude-opus-5-5 check. Recheck pending, not approved. The check id column shows the check each card is
-planned for. The check map below stays on `gap` for these checks until Ahmed
-approves the cards. Spec checks that hold several rules are split: S3 into 3
+after the claude-opus-5-5 check. Approved by the owner on 2026-10-27
+(spec amendments B16 and B17). The check id column shows the check each card
+serves. The check map below names the main card for each approved check.
+Spec checks that hold several rules are split: S3 into 3
 cards, S4 into 2, S6 into 4, S8 into 3, S11 into 2, S12 into 5, S13 into 6,
 S17 into 2, S19 into 3, S20 into 3, S21 into 5, L1 into 3. Review question 30
 has 2 cards (permission rules, edge cases). Cards that cite a Laravel docs page
@@ -166,7 +167,7 @@ carry `docs_version`, `checked_same` and `differs_on`.
 
 ## Health check cards
 
-Drafted 2026-10-27 by claude-sonnet-5-5 (ticket 47), fixed 2026-10-27 after the claude-opus-5-5 check. Every card is a draft: recheck pending, not approved. The check map below still says `gap` for these checks; it changes after the cards are approved. Check id: H1 to H11 are the health checks; "(part)" marks a further card of the same check; HL is a named Laravel reading prompt; L2 to L4 are the named reading steps; G1, G2 and G5 are the spec's gap items; "none" is a rule shared by several checks.
+Drafted 2026-10-27 by claude-sonnet-5-5 (ticket 47), fixed 2026-10-27 after the claude-opus-5-5 check. Approved by the owner on 2026-10-27 (spec amendments B16 and B17). The check map below names the main card for each approved check. Check id: H1 to H11 are the health checks; "(part)" marks a further card of the same check; HL is a named Laravel reading prompt; L2 to L4 are the named reading steps; G1, G2 and G5 are the spec's gap items; "none" is a rule shared by several checks.
 
 406 merged into 449 (the line count of a changed file is a pointer, like every tool number). REV-406 does not exist.
 
@@ -224,9 +225,9 @@ Drafted 2026-10-27 by claude-sonnet-5-5 (ticket 47), fixed 2026-10-27 after the 
 
 ## Review question cards
 
-Drafted 2026-10-27. All are `draft`: none loads and none is approved. Their
-check ids stay `gap` in the check map below until Ahmed approves them; the
-orchestrator moves them then. Question 12 is NOT in the default set: it is
+Drafted 2026-10-27. Approved by the owner on 2026-10-27
+(spec amendments B16 and B17). Their check ids name the main cards in the
+check map below. Question 12 is NOT in the default set: it is
 Ahmed's choice, and the spec leaves the count after it joins open.
 Questions 14 and 19 have no card (open point O4). Questions 24 to 29 belong
 to size and the packet, and question 30 to security.
@@ -263,73 +264,73 @@ Policy cards cover role rules. A check mapped to `gap` still needs a check card.
 
 | check | card id or gap |
 | --- | --- |
-| `Q1` | `gap` |
-| `Q2` | `gap` |
-| `Q3` | `gap` |
-| `Q4` | `gap` |
-| `Q5` | `gap` |
-| `Q6` | `gap` |
-| `Q7` | `gap` |
-| `Q8` | `gap` |
-| `Q9` | `gap` |
-| `Q10` | `gap` |
-| `Q11` | `gap` |
-| `Q12` | `gap` |
-| `Q13` | `gap` |
+| `Q1` | `REV-501` |
+| `Q2` | `REV-502` |
+| `Q3` | `REV-503` |
+| `Q4` | `REV-504` |
+| `Q5` | `REV-505` |
+| `Q6` | `REV-506` |
+| `Q7` | `REV-507` |
+| `Q8` | `REV-508` |
+| `Q9` | `REV-509` |
+| `Q10` | `REV-510` |
+| `Q11` | `REV-511` |
+| `Q12` | `REV-512` |
+| `Q13` | `REV-513` |
 | `Q14` | `gap` |
-| `Q15` | `gap` |
-| `Q16` | `gap` |
-| `Q17` | `gap` |
-| `Q18` | `gap` |
+| `Q15` | `REV-514` |
+| `Q16` | `REV-515` |
+| `Q17` | `REV-516` |
+| `Q18` | `REV-517` |
 | `Q19` | `gap` |
-| `Q20` | `gap` |
-| `Q21` | `gap` |
-| `Q22` | `gap` |
-| `Q23` | `gap` |
+| `Q20` | `REV-518` |
+| `Q21` | `REV-519` |
+| `Q22` | `REV-520` |
+| `Q23` | `REV-521` |
 | `Q24` | `gap` |
 | `Q25` | `REV-110` |
 | `Q26` | `REV-109` |
 | `Q27` | `REV-111` |
 | `Q28` | `REV-112` |
 | `Q29` | `REV-113` |
-| `Q30` | `gap` |
-| `Q31` | `gap` |
-| `Q32` | `gap` |
-| `S1` | `gap` |
-| `S2` | `gap` |
-| `S3` | `gap` |
-| `S4` | `gap` |
-| `S5` | `gap` |
-| `S6` | `gap` |
-| `S7` | `gap` |
-| `S8` | `gap` |
-| `S9` | `gap` |
-| `S10` | `gap` |
-| `S11` | `gap` |
-| `S12` | `gap` |
-| `S13` | `gap` |
-| `S14` | `gap` |
-| `S15` | `gap` |
-| `S16` | `gap` |
-| `S17` | `gap` |
-| `S18` | `gap` |
-| `S19` | `gap` |
-| `S20` | `gap` |
-| `S21` | `gap` |
-| `S22` | `gap` |
-| `L1` | `gap` |
-| `L5` | `gap` |
-| `H1` | `gap` |
-| `H2` | `gap` |
-| `H3` | `gap` |
-| `H4` | `gap` |
-| `H5` | `gap` |
-| `H6` | `gap` |
-| `H7` | `gap` |
-| `H8` | `gap` |
-| `H9` | `gap` |
-| `H10` | `gap` |
-| `H11` | `gap` |
+| `Q30` | `REV-302` |
+| `Q31` | `REV-522` |
+| `Q32` | `REV-523` |
+| `S1` | `REV-301` |
+| `S2` | `REV-304` |
+| `S3` | `REV-305` |
+| `S4` | `REV-308` |
+| `S5` | `REV-310` |
+| `S6` | `REV-311` |
+| `S7` | `REV-315` |
+| `S8` | `REV-316` |
+| `S9` | `REV-319` |
+| `S10` | `REV-320` |
+| `S11` | `REV-321` |
+| `S12` | `REV-323` |
+| `S13` | `REV-328` |
+| `S14` | `REV-334` |
+| `S15` | `REV-335` |
+| `S16` | `REV-336` |
+| `S17` | `REV-337` |
+| `S18` | `REV-339` |
+| `S19` | `REV-340` |
+| `S20` | `REV-343` |
+| `S21` | `REV-346` |
+| `S22` | `REV-351` |
+| `L1` | `REV-352` |
+| `L5` | `REV-111` |
+| `H1` | `REV-401` |
+| `H2` | `REV-404` |
+| `H3` | `REV-407` |
+| `H4` | `REV-408` |
+| `H5` | `REV-409` |
+| `H6` | `REV-410` |
+| `H7` | `REV-413` |
+| `H8` | `REV-415` |
+| `H9` | `REV-418` |
+| `H10` | `REV-422` |
+| `H11` | `REV-425` |
 | `T1` | `gap` |
 | `T2` | `gap` |
 | `T3` | `gap` |
@@ -341,68 +342,9 @@ Policy cards cover role rules. A check mapped to `gap` still needs a check card.
 
 ## Card gap list
 
-- Q1
-- Q2
-- Q3
-- Q4
-- Q5
-- Q6
-- Q7
-- Q8
-- Q9
-- Q10
-- Q11
-- Q12
-- Q13
 - Q14
-- Q15
-- Q16
-- Q17
-- Q18
 - Q19
-- Q20
-- Q21
-- Q22
-- Q23
 - Q24
-- Q30
-- Q31
-- Q32
-- S1
-- S2
-- S3
-- S4
-- S5
-- S6
-- S7
-- S8
-- S9
-- S10
-- S11
-- S12
-- S13
-- S14
-- S15
-- S16
-- S17
-- S18
-- S19
-- S20
-- S21
-- S22
-- L1
-- L5
-- H1
-- H2
-- H3
-- H4
-- H5
-- H6
-- H7
-- H8
-- H9
-- H10
-- H11
 - T1
 - T2
 - T3

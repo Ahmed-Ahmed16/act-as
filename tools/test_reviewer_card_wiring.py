@@ -121,13 +121,17 @@ class RealReviewerWiringTests(unittest.TestCase):
             with self.subTest(card_id=card_id):
                 self.assertIn('size', [mode for mode, _ in loading_steps(REAL_ROLE, card_id)])
 
-    def test_business_rerun_steps_20_to_25_load_and_list_no_card(self):
+    def test_business_rerun_steps_20_to_25_load_their_approved_cards(self):
         self.assertTrue(set(RERUN_STEPS) <= set(cards.steps(REAL_ROLE, 'business')))
+        expected = {'20': ['REV-233', 'REV-236', 'REV-239'], '21': ['REV-234'],
+                    '22': ['REV-235'], '23': [], '24': ['REV-237'], '25': ['REV-238']}
         for step in RERUN_STEPS:
             with self.subTest(step=step):
                 run = run_gate('reviewer', 'business', step)
                 self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
-                self.assertEqual(run.stdout, f'cards.py reviewer business {step}: 0 printed, 0 skipped\n')
+                self.assertEqual(run.stdout.splitlines()[0],
+                                 f'cards.py reviewer business {step}: {len(expected[step])} printed, 0 skipped')
+                self.assertEqual(re.findall(r'^== (REV-\w+) \|', run.stdout, re.MULTILINE), expected[step])
 
     def test_a_rerun_step_number_that_does_not_exist_is_refused(self):
         run = run_gate('reviewer', 'business', '26')

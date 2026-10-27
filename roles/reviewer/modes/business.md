@@ -60,6 +60,7 @@ Before each step, run `cards.py reviewer business <step number>`, for example
    every page used in `runs/`. Exit 1 means git failed: write
    `business: not checked: mapping failed, <the stderr line>`, never a pass.
    Copy its one line of output into the packet's check notes.
+   Page and mapping cards: `REV-201` to `REV-205`, `REV-207` to `REV-209`.
 4. **Areas with no page, and the no area found list.** Read
    `business-map.json`.
    - A changed file in `no_area_found` gets a guess of its area, from the code
@@ -75,6 +76,7 @@ Before each step, run `cards.py reviewer business <step number>`, for example
      says "not now", the brief stays in the packet.
    - A page in `pages_without_covers` that belongs to a touched area: the Not
      checked line above, area incomplete.
+   Missing page and draft cards: `REV-210`, `REV-211`, `REV-226` to `REV-230`.
 5. **Read each rule at the base and at the head.** For each page that maps at
    least 1 file, read the code each rule is about with
    `git show <comparison base>:<path>` and `git show <PR head>:<path>`. Also
@@ -85,6 +87,7 @@ Before each step, run `cards.py reviewer business <step number>`, for example
    `runs/check-record.json`: `kind: rule`, `mode: business`, `area`, `id`
    (the rule id), both reads, `tool_result`, `reading_result`, `word`,
    `reason`. Rule ids repeat across pages, so the `area` field tells them apart.
+   Rule reading cards: `REV-206`, `REV-212`, `REV-213`.
 6. **Judge.** Rule: `REV-P11` (a finding is must fix only when the whole path
    to the harm is confirmed in the code). Use this table. The first matching
    row wins; the gap made worse row comes before the others.
@@ -106,6 +109,7 @@ Before each step, run `cards.py reviewer business <step number>`, for example
    `PR changes rule <id> on the page; needs the owner's yes`. The reviewer
    does not check the owner's yes. Every business entry in every field
    carries `area: <name>`.
+   Rule judgement cards: `REV-214` to `REV-223`, `REV-225`, `REV-232`.
 7. **Verdict.** Write each area's state (`pass`, `fail`, `incomplete`,
    `not checked`, with a reason) to `runs/business-areas.json`:
    `{"areas":[{"area":"...","state":"...","reason":"..."}]}`. Include every
@@ -114,6 +118,7 @@ Before each step, run `cards.py reviewer business <step number>`, for example
    and use its line as the business line, as it is. Fail if any area fails;
    else incomplete if any area is not checked or depends on something; else
    pass. A rerun's verdict is rebuilt the same way from every area.
+   Business verdict card: `REV-231`.
 8. **Write the packet.** `packet.md` in the packet format the packet check
    reads (ROLE.md and the size mode file give the shape). For a business run
    alone: identity `mode=business`; the size, security and health lines say
@@ -150,8 +155,7 @@ health step.
 
 These steps have their own numbers, 20 to 25, so `cards.py` can load them.
 Before each one, run `cards.py reviewer business <step number>`, for example
-`cards.py reviewer business 20`. No business card is approved yet, so these
-steps list none.
+`cards.py reviewer business 20`. The cards below load for these steps.
 
 20. **RR1. Check.** Run
    `python tools/business_verdict.py rerun-check --packet <packet folder> --head <current PR head> [--drafts <drafts folder>]`.
@@ -160,15 +164,18 @@ steps list none.
    default commits from the identity line (`use base`, `use default`) and any
    `page changed since the first run: <area>` lines. Copy those lines into
    Not checked.
+   Rerun start and hash cards: `REV-233`, `REV-236`, `REV-239`.
 21. **RR2. Read the same commits.** Use the base and default commits the tool
    printed, never a newer default branch head. Run step 3 with them, with the
    area's new page (a new draft in the drafts folder, or the page now on the
    default branch commit named in the identity line; a page merged after the
    first run is not on that commit, so use the draft).
+   Rerun reading card: `REV-234`.
 22. **RR3. Replace the area.** Redo steps 4 to 6 for that area only. Replace that
    area's entries by their `area` field in every field of the packet, in
    `check-record.json` and in `rules-pages.json`. Rewrite the draft message.
    Remove the grill brief of that area when its page now exists.
+   Rerun replacement card: `REV-235`.
 23. **RR4. Rebuild the verdict.** Update `runs/business-areas.json` with every
    area the PR touches, the other areas as they were. Run the step 7 command.
    Fixing 1 area must not pass business while another area is still
@@ -182,10 +189,12 @@ steps list none.
    and gains `also: rerun security for <area>`. A line that says `not asked` or
    `not checked` stays as it is. Whether a page "says who may do what" is a
    reading call (open question O10): state your reason in 1 line.
+   Rerun security line card: `REV-237`.
 25. **RR6. Add the rerun line.** Under the verdict lines add
    `business rerun for <area>, <YYYY-MM-DD>, head <full head sha>`. Run the
    packet check again (step 9) and show the packet after it passes. The size
    and health lines stay as they were.
+   Rerun finish card: `REV-238`.
 
 ## Grill needed
 

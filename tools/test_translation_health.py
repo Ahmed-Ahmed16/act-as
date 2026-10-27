@@ -207,6 +207,36 @@ $mail->with('other', 'Your order shipped');
         self.save_orders()
         self.assertEqual(self.report()['check1'][0]['page'], 'shared')
 
+    def test_controller_and_its_view_form_1_page(self):
+        # Ticket 64: counting source files split 1 rendered page into 2 groups.
+        self.write('app/Parcel.php', '')
+        self.write('resources/views/cart.blade.php', '')
+        controller = 'app/Http/Controllers/CartController.php'
+        view = 'resources/views/cart/index.blade.php'
+        self.write(view, "{{ __('Save') }} {{ __('orders.title') }}")
+        for render in ["view('cart.index')", 'View::make("cart.index", [])']:
+            with self.subTest(render=render):
+                self.write(controller, "<?php __('orders.hello'); __('orders.title'); return " + render + ';')
+                self.assertEqual(self.report()['by_page']['groups'], {
+                    view: ['Save', 'orders.hello', 'orders.title'],
+                    'no use found': ['orders.count']})
+
+    def test_unrelated_controller_and_view_stay_2_pages(self):
+        controller = 'app/Http/Controllers/CartController.php'
+        self.write('app/Parcel.php', '')
+        renders = ["return response('OK');", 'return view($page);',
+                   "return view('cart.' . $page);", "return view('cart.missing');",
+                   "view('cart'); return view('orders.index');",
+                   "// return view('cart');\nreturn response('OK');",
+                   '''$example = "view('cart')"; return response('OK');''']
+        for render in renders:
+            with self.subTest(render=render):
+                self.write(controller, "<?php __('orders.title'); " + render)
+                self.assertEqual(self.report()['by_page']['groups'], {
+                    controller: ['orders.title'],
+                    'resources/views/cart.blade.php': ['Save'],
+                    'no use found': ['orders.count', 'orders.hello']})
+
     def test_unreadable_translation_is_preserved_and_marked_not_checked(self):
         self.write('lang/ar/orders.php', '<?php return [')
         report = self.report()

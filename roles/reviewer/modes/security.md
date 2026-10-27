@@ -66,6 +66,7 @@ Before each step, run `cards.py reviewer security <step number>`, for example
    - **L5, a file the task does not need.** Each changed file has a reason in
      the task. A file with no reason is a lead, read first. It only sets the
      reading order.
+     Unrelated file card: `REV-111`.
    - **S1, login but no owner check.** Is there an owner or permission check for
      this action on this record? A job or command must not use system rights
      for a user's request. "User A asks for user B's record" is a flaw only
@@ -121,6 +122,12 @@ Before each step, run `cards.py reviewer security <step number>`, for example
      make an outside charge atomic.
    L2, L3 and L4 live in health. When one touches access, money or private
    data, report it here as a security finding too.
+   Access cards: `REV-301` to `REV-307`.
+   Input and output cards: `REV-308` to `REV-319`.
+   Secrets and login cards: `REV-320` to `REV-327`.
+   Settings and unsafe call cards: `REV-328` to `REV-342`.
+   Callback and dependency cards: `REV-343` to `REV-350`.
+   Removed safeguard and request order cards: `REV-351` to `REV-354`.
 5. **Write each finding.** Words: `must fix`, `finding`, `lead`. No scale, no
    CVSS. Every entry in Known risks carries: the word, file and line, the
    abuse line ("who does what, step by step, to get what"), and the harm
