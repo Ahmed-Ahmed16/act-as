@@ -48,6 +48,54 @@ check map below; the others are rules of the size step.
 Q24 (proof shown by the author) stays on the gap list: the research found no
 primary source, only community posts.
 
+## Business step cards
+
+Drafted 2026-10-27 for ticket 45. All drafts: a different model checks them against the raw
+source, then Ahmed approves. Business has no check id in the check map, so the
+check id column says none. The step column says where each card belongs in the business mode
+file (a number is a step of `## Steps`; `rerun` has no step number yet, see the report).
+
+| id | mode | trigger | status | check id | step | rule in short |
+| --- | --- | --- | --- | --- | --- | --- |
+| REV-201 | business, full | When looking for the rules page of an area | approved | none | 3 | Pages come from docs/business-rules on the default branch commit. |
+| REV-202 | business, full | When naming or judging a rules page | approved | none | 3 | A page name uses business words. |
+| REV-203 | business, full | When reading the Covers line of a page | approved | none | 3 | The Covers line sits within the first 5 lines. |
+| REV-204 | business, full | When a Covers entry holds a wildcard or pattern | approved | none | 3 | Covers entries are plain files and folders; a pattern is not read. |
+| REV-205 | business, full | When a rules page has no Covers line | approved | none | 3 | A page with no Covers line is not applied; the area is incomplete. |
+| REV-206 | business, full | When reading the code for a rule | approved | none | 5 | A status on the page is a hint, not an answer. |
+| REV-207 | business, full | When a rule line has 2 statuses or none | approved | none | 3 | A rule with 2 statuses or none is not read; the area is incomplete. |
+| REV-208 | business, full | When listing the changed files for the business step | approved | none | 3 | List changed files with rename detection on. |
+| REV-209 | business, full | When mapping a renamed file to areas | approved | none | 3 | A renamed file is checked by its old path and its new path. |
+| REV-210 | business, full | When a changed file is in the no area found list | approved | none | 4 | A changed file no page covers goes in the no area found list as a lead. |
+| REV-211 | business, full | When a lead file changes behaviour | approved | none | 4 | A lead that changes behaviour is judged by its guessed area. |
+| REV-212 | business, full | When reading the code behind a rule | approved | none | 5 | Read removed lines and callers, not only the files Covers names. |
+| REV-213 | business, full | When a rule has no code at the comparison base | approved | none | 5 | No code at the base: write baseline none, new feature, and read the head. |
+| REV-214 | business, full | When a match rule is broken by the PR | approved | none | 6 | A broken match rule is a must fix finding and the area fails. |
+| REV-215 | business, full | When writing the rule line of a broken match rule | approved | none | 6 | Write the broken rule line in the page's own words, with the value. |
+| REV-216 | business, full | When a gap rule is made worse by the PR | approved | none | 6 | A gap made worse is a must fix finding and the area fails. |
+| REV-217 | business, full | When new code in an existing door does not follow a gap rule | approved | none | 6 | New code in an existing door that ignores a gap rule is a finding. |
+| REV-218 | business, full | When the PR leaves a gap rule alone | approved | none | 6 | A gap left alone is a pointer. |
+| REV-219 | business, full | When the PR fixes a gap rule | approved | none | 6 | A gap the PR fixes is 1 line in Behaviour changed, plus a draft note. |
+| REV-220 | business, full | When the PR changes behaviour under an owner or open rule | approved | none | 6 | A changed owner or open rule makes the area incomplete. |
+| REV-221 | business, full | When a rule and its code are changed in the same PR | approved | none | 6 | A rule and its code changed together: incomplete, merge only after the owner says yes. |
+| REV-222 | business, full | When writing the approval line for a changed rule | approved | none | 6 | The reviewer never says the owner approved; print the old and new text. |
+| REV-223 | business, full | When the PR changes a rules page | approved | none | 6 | A PR that changes a rule on the page shows the change on its own line. |
+| REV-225 | business, full | When new behaviour has no rule on the page | approved | none | 6 | New behaviour with no rule is a pointer with a draft question. |
+| REV-226 | business, full | When a touched area has no rules page | approved | none | 4 | An area with no page: not checked, incomplete, never a pass. |
+| REV-227 | business, full | When writing the grill brief for a missing page | approved | none | 4 | A grill brief holds the area, the code facts, the PR change and draft questions. |
+| REV-228 | business, full | When writing a draft rules page | approved | none | 4 | A grill draft page is written only to the drafts folder. |
+| REV-229 | business, full | When a draft rules page is used | approved | none | 4 | A draft page that was used is named by its path and SHA 256, with a copy. |
+| REV-230 | business, full | When an area has both a page and a draft | approved | none | 4 | The default branch page wins over a draft; add a pointer. |
+| REV-231 | business, full | When building the business verdict | approved | none | 7 | Business fails if any area fails; else incomplete if any is open; else pass. |
+| REV-232 | business, full | When writing a business entry | approved | none | 6 | Every business entry carries area: <name>. |
+| REV-233 | business | When a business rerun starts | approved | none | rerun | A rerun refuses when the PR head has moved. |
+| REV-234 | business | When a business rerun reads its commits and pages | approved | none | rerun | A rerun reads the commits named in the identity line. |
+| REV-235 | business | When a business rerun writes the packet | approved | none | rerun | A rerun replaces only the named area's entries. |
+| REV-236 | business | When a business rerun starts | approved | none | rerun | A business rerun runs no size, security or health step. |
+| REV-237 | business | When a business rerun adds a page about who may do what | approved | none | rerun | A rerun that adds a page about who may do what changes the security line. |
+| REV-238 | business | When a business rerun finishes | approved | none | rerun | A rerun adds the line business rerun for <area>, date, head. |
+| REV-239 | business | When a business rerun checks draft pages | approved | none | rerun | A rerun rechecks the hash of every draft page and glossary. |
+
 ## Check map
 
 Policy cards cover role rules. A check mapped to `gap` still needs a check card.
