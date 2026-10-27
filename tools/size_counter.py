@@ -38,8 +38,10 @@ def git_bytes(repo, *args):
 
 
 def changed_files(repo, comparison):
-    raw = git_bytes(repo, 'diff', '--no-renames', '--raw', '-z', '--abbrev=40', comparison)
-    numstat = git_bytes(repo, 'diff', '--no-renames', '--numstat', '-z', comparison)
+    raw = git_bytes(repo, 'diff', '--no-color', '--no-ext-diff', '--no-renames',
+                    '--raw', '-z', '--abbrev=40', comparison)
+    numstat = git_bytes(repo, 'diff', '--no-color', '--no-ext-diff', '--no-renames',
+                        '--numstat', '-z', comparison)
     tokens = raw.split(b'\0')
     if tokens[-1] or len(tokens) % 2 != 1:
         raise GitError('git raw output has an unfinished file')
@@ -132,7 +134,8 @@ def count_files(files, head_blobs, base_blobs):
 
 def file_hunks(repo, comparison, row, file_index):
     # A literal path keeps names such as fruit [1].py from matching other files.
-    patch = git_bytes(repo, 'diff', '--no-renames', '-U0', comparison,
+    patch = git_bytes(repo, 'diff', '--no-color', '--no-ext-diff', '--no-renames',
+                      '--inter-hunk-context=0', '-U0', comparison,
                       '--', ':(literal)' + row['path'])
     hunks = []
     for number, header in enumerate(HUNK_HEADER.finditer(patch), 1):

@@ -43,9 +43,9 @@ class BusinessVerdictTests(unittest.TestCase):
 
     def test_area_states_set_verdict_and_failures_come_first(self):
         cases = [
-            ([('zindle', 'pass')], 'business: pass, 1 areas, every rule kept'),
+            ([('zindle', 'pass')], 'business: pass, area zindle: every rule kept'),
             ([('zindle', 'pass'), ('floop', 'pass')],
-             'business: pass, 2 areas, every rule kept'),
+             'business: pass, area zindle: every rule kept; area floop: every rule kept'),
             ([('zindle', 'incomplete'), ('floop', 'not checked'), ('plim', 'pass')],
              'business: incomplete, area zindle: glorp; area floop: glorp'),
             ([('zindle', 'not checked')], 'business: incomplete, area zindle: glorp'),
