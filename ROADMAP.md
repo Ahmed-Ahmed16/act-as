@@ -80,8 +80,7 @@ What is done, what is next, and what is still untested. Updated 2026-10-27.
    - The private test fixtures wait on the owner's commands (ticket 10).
      Tickets 12 to 15, 18, 30, 39 and 44 wait behind them.
    - Licence notices for the borrowed sources (ticket 50).
-   - 3 owner decisions: the README role row, the developer cap card
-     DEV-P01, and the glossary commit.
+   - 1 owner decision: the glossary commit (deferred 2026-10-28).
    Later: move the developer card gap "Small changes and code review
    practice" under the reviewer.
 5. **Wider sources.** The user is not yet sure the roles work as intended.
