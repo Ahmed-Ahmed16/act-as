@@ -36,6 +36,7 @@ split-plan.json: groups, first_group_parts, unplaced. Each group has
 name, entry_points, estimate, hunks (hunk ids).
 rules-pages.json: areas. Each area has area, page, commit, rules.
 Each rule has id, status. All collection fields are lists.
+Counted lines must be integers. Hunk ids must be strings.
 Bad file contents or list/object shapes exit 2 and name the file.
 Missing entry fields exit 1, using input-fields if no other rule fails.
 Full and security identity modes require S1 through S22, L1, L5 plus required_ids.
@@ -65,13 +66,24 @@ MONEY_END = '. Needs the separate Opus review before merge. Not done by this rev
 INPUT_SHAPES = {
     'check-record.json': {'required_ids': [], 'entries': dict.fromkeys(
         'id mode area kind tool_result reading_result word reason base_read head_read'.split())},
-    'files.json': {'files': {**dict.fromkeys('path old_path status kind counted_lines'.split()),
-                             'hunks': dict.fromkeys(['id', 'counted_lines'])}},
+    'files.json': {'files': {**dict.fromkeys('path old_path status kind'.split()),
+                             'counted_lines': int, 'hunks': {'id': str, 'counted_lines': int}}},
     'split-plan.json': {'groups': {**dict.fromkeys(['name', 'estimate']),
-                                  'entry_points': [], 'hunks': []},
-                        'first_group_parts': [], 'unplaced': []},
+                                  'entry_points': [], 'hunks': [str]},
+                        'first_group_parts': [], 'unplaced': [str]},
     'rules-pages.json': {'areas': {**dict.fromkeys(['area', 'page', 'commit']),
                                   'rules': dict.fromkeys(['id', 'status'])}}}
+
+
+def input_type(contents, schema, location):
+    if isinstance(schema, type):
+        if type(contents) is not schema:
+            raise ValueError(location + ' must be ' + schema.__name__)
+    elif not isinstance(contents, list):
+        raise ValueError(location + ' must be a list')
+    elif isinstance(schema, list) and schema:
+        for index, entry in enumerate(contents):
+            input_type(entry, schema[0], f'{location}[{index}]')
 
 
 def input_fields(document, schema, location):
@@ -83,8 +95,7 @@ def input_fields(document, schema, location):
     for field, children in schema.items():
         if children is None or field not in document:
             continue
-        if not isinstance(document[field], list):
-            raise ValueError(location + '.' + field + ' must be a list')
+        input_type(document[field], children, location + '.' + field)
         if isinstance(children, dict):
             for index, entry in enumerate(document[field]):
                 missing.extend(input_fields(entry, children, f'{location}.{field}[{index}]'))

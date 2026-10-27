@@ -419,6 +419,45 @@ class PacketCheckTests(unittest.TestCase):
                 self.write_inputs()
                 self.assert_bad_input(self.packet)
 
+    # G8 boundaries: numeric text, float, bool, null, list, object;
+    # file and hunk counts, hunk ids, grouped ids, and unplaced ids.
+    def test_saved_counts_require_integers(self):
+        for location in ['files[0]', 'files[0].hunks[0]']:
+            for bad in ['70', 70.0, True, None, [], {}]:
+                with self.subTest(location=location, bad=bad):
+                    self.inputs = good_inputs()
+                    file = self.inputs['files.json']['files'][0]
+                    target = file if location == 'files[0]' else file['hunks'][0]
+                    target['counted_lines'] = bad
+                    self.write_inputs()
+                    run = self.run_check(self.packet)
+                    self.assertEqual(run.returncode, 2, run.stdout + run.stderr)
+                    self.assertEqual(run.stdout, '')
+                    self.assertEqual(run.stderr.splitlines(), [
+                        f'packet_check: files.json.{location}.counted_lines must be int'])
+
+    def test_saved_hunk_ids_require_strings(self):
+        cases = [('files.json', 'files[0].hunks[0].id'),
+                 ('split-plan.json', 'groups[0].hunks[0]'),
+                 ('split-plan.json', 'unplaced[0]')]
+        for filename, location in cases:
+            for bad in [{}, [], None, 7, True]:
+                with self.subTest(filename=filename, location=location, bad=bad):
+                    self.inputs = good_inputs()
+                    packet = self.split_packet()
+                    if filename == 'files.json':
+                        self.inputs[filename]['files'][0]['hunks'][0]['id'] = bad
+                    elif location.startswith('groups'):
+                        self.inputs[filename]['groups'][0]['hunks'] = [bad]
+                    else:
+                        self.inputs[filename]['unplaced'] = [bad]
+                    self.write_inputs()
+                    run = self.check_text(packet)
+                    self.assertEqual(run.returncode, 2, run.stdout + run.stderr)
+                    self.assertEqual(run.stdout, '')
+                    self.assertEqual(run.stderr.splitlines(), [
+                        f'packet_check: {filename}.{location} must be str'])
+
     def test_nested_json_lists_and_object_entries_require_shapes(self):
         for key in ['hunks', 'rules', 'entry_points']:
             for bad in [None, {}, [None]]:
