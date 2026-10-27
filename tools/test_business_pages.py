@@ -172,6 +172,52 @@ class BusinessPagesTests(unittest.TestCase):
                          ['R31', 'R32', 'R33', 'R34', 'R35', 'R36', 'R37', 'R38'],
                          ['match', 'multiple', 'multiple', 'none', 'none', 'gap', 'owner', 'open'])])
 
+    def test_selected_area_rerun_preserves_other_saved_draft(self):
+        # G17: another area's changed draft must not replace its reviewed copy.
+        for area in ('zindle', 'floop'):
+            (self.drafts / f'{area}.md').write_text(
+                f'Covers: app/{area}/\nR1. **match**\n', encoding='utf-8')
+            self.write(f'app/{area}/Policy.php', 'glorp\n')
+        head = self.commit()
+        self.packet(head, '--drafts', self.drafts)
+        manifest_path = self.out / 'rules-pages.json'
+        before = json.loads(manifest_path.read_text(encoding='utf-8'))['areas']
+        saved_other = self.out / 'runs/rules-page-floop.md'
+        other_bytes = saved_other.read_bytes()
+        changed = b'Covers: app/zindle/\nR41. **gap**\n'
+        (self.drafts / 'zindle.md').write_bytes(changed)
+        (self.drafts / 'floop.md').write_text('Covers: app/floop/\nR3. **gap**\n', encoding='utf-8')
+        run = self.run_cli(head, '--drafts', self.drafts, '--area', 'zindle')
+        self.assertEqual(run.returncode, 0, run.stderr)
+        after = json.loads(manifest_path.read_text(encoding='utf-8'))['areas']
+        by_area = {page['area']: page for page in after}
+        self.assertEqual(set(by_area), {'zindle', 'floop'})
+        self.assertEqual(by_area['floop'], next(page for page in before if page['area'] == 'floop'))
+        self.assertEqual(saved_other.read_bytes(), other_bytes)
+        self.assertEqual(by_area['zindle']['commit'], 'sha256:' + hashlib.sha256(changed).hexdigest())
+        self.assertEqual(by_area['zindle']['rules'], [dict(id='R41', status='gap')])
+        self.assertEqual((self.out / 'runs/rules-page-zindle.md').read_bytes(), changed)
+
+    def test_smaller_mapping_keeps_previous_area_entry_and_page(self):
+        # G17: a run supplying only 1 touched area must not drop the other.
+        for area in ('zindle', 'floop'):
+            self.page(area, f'Covers: app/{area}/\nR1. **match**\n')
+        self.default = self.base = self.commit()
+        for area in ('zindle', 'floop'):
+            self.write(f'app/{area}/Policy.php', 'glorp\n')
+        head = self.commit()
+        self.packet(head)
+        manifest_path = self.out / 'rules-pages.json'
+        before = json.loads(manifest_path.read_text(encoding='utf-8'))['areas']
+        saved_other = self.out / 'runs/rules-page-floop.md'
+        other_bytes = saved_other.read_bytes()
+        self.base = head
+        self.write('app/zindle/Policy.php', 'plim\n')
+        self.packet(self.commit())
+        after = json.loads(manifest_path.read_text(encoding='utf-8'))['areas']
+        self.assertEqual(after, before)
+        self.assertEqual(saved_other.read_bytes(), other_bytes)
+
     def test_git_objects_ignore_working_tree_and_output_is_stable(self):
         self.page('zindle', 'Covers: app/Loans/\n')
         self.write('app/Loans/Loan.php', 'zindle\n')
@@ -205,6 +251,27 @@ class BusinessPagesTests(unittest.TestCase):
         report = self.packet(self.commit())
         self.assertEqual(report['no_area_found'], [dict(path='glorp.php', old_path=None)])
 
+    def test_invalid_saved_manifest_refuses_without_replacing_saved_pages(self):
+        self.page('zindle', 'Covers: app/Loans/\nR1. **match**\n')
+        self.default = self.base = self.commit()
+        self.write('app/Loans/Loan.php', 'floop\n')
+        head = self.commit()
+        self.packet(head)
+        manifest_path = self.out / 'rules-pages.json'
+        saved_page = self.out / 'runs/rules-page-zindle.md'
+        before = saved_page.read_bytes()
+        for contents in ['{', '[]', '{"areas": null}', '{"areas": [null]}',
+                         '{"areas": [{"area": ""}]}',
+                         '{"areas": [{"area": "zindle"}, {"area": "zindle"}]}']:
+            with self.subTest(contents=contents):
+                manifest_path.write_text(contents, encoding='utf-8')
+                run = self.run_cli(head)
+                self.assertEqual(run.returncode, 2, run.stderr)
+                self.assertEqual(run.stdout, '')
+                self.assertTrue(run.stderr.startswith('business_pages: error: '), run.stderr)
+                self.assertEqual(manifest_path.read_text(encoding='utf-8'), contents)
+                self.assertEqual(saved_page.read_bytes(), before)
+
     def test_bad_refs_fail_without_output(self):
         self.env['PYTHONIOENCODING'] = 'ascii'
         for flag, ref in [('--base', 'zindle-missing'), ('--head', 'zindle-missing'),
@@ -221,6 +288,10 @@ class BusinessPagesTests(unittest.TestCase):
         run = self.run_cli(self.base, '--drafts', self.root / 'missing')
         self.assertEqual(run.returncode, 2, run.stderr)
         self.assertEqual(run.stdout, '')
+        run = self.run_cli(self.base, '--area', 'zindle')
+        self.assertEqual(run.returncode, 2, run.stderr)
+        self.assertIn('requested area is not touched', run.stderr)
+        self.assertFalse(self.out.exists())
 
 
 if __name__ == '__main__':
