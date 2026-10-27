@@ -37,8 +37,11 @@ def verdict(options):
     pending = [area for area in areas if area['state'] != 'pass']
     pending.sort(key=lambda area: area['state'] != 'fail')
     if not pending:
+        draft_notice = 'rules page: draft, not in the repo yet'
         print('business: pass, ' + '; '.join(
-            f'area {area["area"]}: every rule kept' for area in areas))
+            f'area {area["area"]}: every rule kept'
+            + (', ' + draft_notice if draft_notice in area['reason'] else '')
+            for area in areas))
     else:
         state = 'fail' if pending[0]['state'] == 'fail' else 'incomplete'
         print(f'business: {state}, ' + '; '.join(

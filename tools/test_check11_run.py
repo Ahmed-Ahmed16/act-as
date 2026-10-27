@@ -2,6 +2,7 @@ import json
 import io
 import os
 import shlex
+import stat
 import subprocess
 import sys
 import tempfile
@@ -269,6 +270,38 @@ class RunTests(unittest.TestCase):
             _, report = self.checked()
         self.assertEqual(report['tests'][0]['tool_result'], 'not checked')
         self.assertEqual(report['tests'][0]['reason'], 'copy did not return to green after reset')
+
+    def test_review_N7_reset_preserves_fault_file_timestamp(self):
+        transport = self.fake_docker
+        timestamps = []
+
+        def inspect_timestamp(argv, **kwargs):
+            if argv[:2] == ['docker', 'run']:
+                timestamps.append((Path(kwargs['cwd']) / 'cart.php').stat().st_mtime_ns)
+            return transport(argv, **kwargs)
+
+        with patch.object(self, 'fake_docker', side_effect=inspect_timestamp):
+            summary, _ = self.checked()
+        self.assertEqual(summary['result'], 'clean')
+        self.assertEqual(timestamps[-1], timestamps[0])
+
+    @unittest.skipIf(os.name == 'nt', 'Windows does not preserve POSIX executable mode bits')
+    def test_review_N7_reset_preserves_executable_fault_file_mode(self):
+        self.source.chmod(0o755)
+        self.freeze()
+        transport = self.fake_docker
+        modes = []
+
+        def inspect_mode(argv, **kwargs):
+            if argv[:2] == ['docker', 'run']:
+                modes.append(stat.S_IMODE((Path(kwargs['cwd']) / 'cart.php').stat().st_mode))
+            return transport(argv, **kwargs)
+
+        with patch.object(self, 'fake_docker', side_effect=inspect_mode):
+            summary, _ = self.checked()
+        self.assertEqual(summary['result'], 'clean')
+        self.assertEqual(modes[0], 0o755)
+        self.assertEqual(modes[-1], 0o755)
 
     def test_fault_must_match_exactly_once(self):
         for old in ['absent', 'E']:
@@ -555,6 +588,34 @@ class RunTests(unittest.TestCase):
                 self.assertEqual(stopped, [failed['argv'][failed['argv'].index('--name') + 1]])
                 self.assertTrue(stopped[0].startswith('actas-t36-'))
                 self.assertFalse(Path(failed['cwd']).exists())
+
+    def test_review_N8_missing_docker_saves_failed_call_and_h11_record(self):
+        transport = self.fake_docker
+        # Launch failures can happen at the start, either probe, fault run, or reset run.
+        for number, step in enumerate(['start', 'probe_before', 'probe_after',
+                                       'fault_run', 'green_again'], 1):
+            failed_calls = []
+
+            def missing_docker(argv, **kwargs):
+                if (argv[:2] == ['docker', 'run'] and
+                        argv[argv.index('--name') + 1].endswith(f'-{number}')):
+                    failed_calls.append(argv)
+                    raise FileNotFoundError('docker fixture missing')
+                return transport(argv, **kwargs)
+
+            with self.subTest(step=step), patch.object(self, 'fake_docker', side_effect=missing_docker):
+                summary, report = self.checked('--record', str(self.record), '--reading-result', 'clean')
+                self.assertEqual(summary['result'], 'not checked')
+                picked = report['tests'][0]
+                self.assertEqual(picked['tool_result'], 'not checked')
+                failed = next(s for s in picked['steps'] if s['step'] == step)
+                self.assertEqual(failed['argv'], failed_calls[0])
+                self.assertEqual(failed['error'], 'docker fixture missing')
+                self.assertEqual(picked['reason'], 'tool did not run, ' + shlex.join(failed_calls[0]))
+                saved = json.loads(self.record.read_text(encoding='utf-8'))['entries'][0]
+                self.assertEqual(saved['id'], 'H11')
+                self.assertEqual(saved['tool_result'], 'not checked')
+                self.assertEqual(saved['reason'], summary['reason'])
 
     def test_required_head_and_invalid_image_or_timeout_refuse_before_running(self):
         for args, message in [(('--head', 'missing-commit'), 'git failed'),
