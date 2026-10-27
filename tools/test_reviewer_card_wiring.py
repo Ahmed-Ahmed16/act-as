@@ -92,6 +92,23 @@ class UnwiredCardCheckTests(unittest.TestCase):
 
 class RealReviewerWiringTests(unittest.TestCase):
     # Known good: the real role files.
+    def test_health_questions_5_9_21_apply_to_the_diff_without_a_pointer(self):
+        # G41: the real gate must print the conditions agreed in B17.
+        run = run_gate('reviewer', 'health', '18')
+        self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
+        printed = dict(re.findall(r'^== (REV-\w+) \|[^\n]*\n(.*?)(?=^== |\Z)',
+                                  run.stdout, re.MULTILINE | re.DOTALL))
+        for card_id in ['REV-505', 'REV-509', 'REV-519']:
+            self.assertIn(card_id, printed)
+            fields = dict(re.findall(r'^([\w-]+): *(.*)$', printed[card_id], re.MULTILINE))
+            for field in ['applies-when', 'extra']:
+                with self.subTest(card_id=card_id, field=field):
+                    if field == 'applies-when':
+                        self.assertTrue(fields[field].startswith('The PR '), fields[field])
+                    else:
+                        self.assertIn('asked when the diff shows the relevant change.', fields[field])
+                    self.assertNotIn('pointer', fields[field])
+
     def test_every_approved_reviewer_card_is_loaded_by_a_step(self):
         self.assertEqual(unwired_cards(REAL_ROLE), [])
 

@@ -46,7 +46,7 @@ def rendered_views(text):
             continue
         context = [part for part, _ in tokens[max(0, index - 3):index]]
         if context != ['View', '::', 'make'] and not (
-                context[-1:] == ['view'] and context[-2:-1] not in (['->'], ['::'], ['$'])):
+                context[-1:] == ['view'] and context[-2:-1] not in (['::'], ['$'])):
             continue
         parts, _ = arguments(tokens, index)
         names.add(literal(parts[0]) if parts else None)
