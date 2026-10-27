@@ -31,6 +31,10 @@ class StepTimeout(ValueError):
     pass
 
 
+class StepLaunchError(ValueError):
+    pass
+
+
 def git_output(repo, *args):
     completed = subprocess.run(['git', '-C', str(repo), *args], capture_output=True)
     if completed.returncode:
@@ -152,6 +156,10 @@ class Runner:
             except (OSError, subprocess.TimeoutExpired) as error:
                 evidence['stop_error'] = str(error)
             raise StepTimeout(f'{step} timed out') from None
+        except OSError as error:
+            self.steps.append(dict(step=step, command=command, argv=argv,
+                                   cwd=str(self.copy), error=str(error)))
+            raise StepLaunchError('tool did not run, ' + shlex.join(argv)) from None
         output = completed.stdout + completed.stderr
         evidence = dict(step=step, command=command, argv=argv, cwd=str(self.copy),
                         exit_code=completed.returncode, output='\n'.join(output.splitlines()[-40:]),
@@ -180,7 +188,7 @@ def check_test(picked, command, runner, snapshot):
     try:
         rebuild_copy(snapshot, runner.copy)
         return run_test(picked, command, runner, snapshot)
-    except (StepTimeout, UnsafeTree) as error:
+    except (StepTimeout, StepLaunchError, UnsafeTree) as error:
         return dict(test=picked['name'], tool_result='not checked', reason=str(error),
                     word='none', steps=runner.steps)
 
@@ -213,9 +221,6 @@ def run_test(picked, command, runner, snapshot):
                 tool_result, reason = fault_verdict(red, before, after)
             finally:
                 rebuild_copy(snapshot, runner.copy)
-                if target.exists() or target.is_symlink():
-                    os.unlink(target)
-                shutil.copyfile(snapshot / fault['file'], target)
                 equal = target.read_bytes() == (snapshot / fault['file']).read_bytes()
                 runner.steps.append(dict(step='reset', byte_equal=equal))
                 green = runner.run('green_again', command)['parsed']['state']

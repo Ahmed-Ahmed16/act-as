@@ -226,6 +226,16 @@ class SecurityScanTests(unittest.TestCase):
             {('S22', p, 'removed', n) for n, p in enumerate(patterns[:8], 1)} |
             {('S7', '@csrf', 'removed', 9), ('S11', 'signed', 'removed', 4)})
 
+    def test_review_n6_php_templates_produce_sql_hits(self):
+        for name in ['a.phtml', 'b.tpl']:
+            self.write(name, '<?php DB::raw($x); ?>\n')
+        self.head = self.commit()
+        hits = self.finders()['hits']
+        for name in ['a.phtml', 'b.tpl']:
+            with self.subTest(path=name):
+                self.assertIn(('S4', name, 1),
+                              [(h['check'], h['path'], h['line']) for h in hits])
+
     def test_secrets_are_masked_even_when_another_check_matches(self):
         secrets = ['AKIA' + 'F' * 16, 'ghp_' + 'g' * 24, 'sk_live_' + 'h' * 12,
                    '-----BEGIN FERN PRIVATE KEY-----', 'fern-default']
@@ -437,6 +447,47 @@ class SecurityScanTests(unittest.TestCase):
         raw = (self.out / 'semgrep-raw.txt').read_text(encoding='utf-8')
         self.assertNotIn('T' * 10, raw)
         self.assertIn('[redacted]', raw)
+
+    def test_review_n5_semgrep_json_masks_nested_strings_before_saving(self):
+        # Cases: nested objects/lists, scalar values, successful/failed scans.
+        source = '$password = "abcdefgh123456";'
+        payload = {'results': [{'check_id': EXEC_RULE, 'path': 'app/Fern.php',
+                    'start': {'line': 3}, 'extra': {'lines': source,
+                    'metadata': [source, {'source': source}, 7, None, True]}}],
+                   'paths': {'scanned': ['app/Fern.php']}}
+        for exit_code in [0, 2]:
+            with self.subTest(exit_code=exit_code):
+                scan = self.tools(DockerRunner(semgrep=exit_code,
+                    payload=json.dumps(payload).encode()))['tools']['semgrep']
+                self.assertEqual(scan['status'], 'ran' if exit_code == 0 else 'not checked')
+                for suffix in ['json', 'txt']:
+                    with self.subTest(suffix=suffix):
+                        saved = (self.out / ('semgrep-raw.' + suffix)).read_text(encoding='utf-8')
+                        self.assertNotIn('abcdefgh123456', saved)
+                        self.assertIn('[redacted]', saved)
+                        extra = json.loads(saved)['results'][0]['extra']
+                        self.assertEqual(extra['lines'], '$[redacted];')
+                        self.assertEqual(extra['metadata'],
+                                         ['$[redacted];', {'source': '$[redacted];'}, 7, None, True])
+
+    def test_review_n5_invalid_semgrep_json_masks_quoted_assignments(self):
+        # Cases: plain/escaped quotes, interior escaped quote, truncated value.
+        sources = ['$value = ' + quote + 'abcdefgh123456' + quote + ';'
+                   for quote in ['"', "'", '\\"', "\\'"]]
+        sources += [json.dumps({'lines': '$value = "prefix\\"abcdefgh123456";'})[:-1],
+                    r'{"lines":"$password = \"abcdefgh123456']
+        for source in sources:
+            with self.subTest(source=source):
+                payload = ('broken JSON\n' + source + '\nscan diagnostic').encode()
+                scan = self.tools(DockerRunner(payload=payload))['tools']['semgrep']
+                self.assertEqual(scan['status'], 'not checked')
+                self.assertIn('invalid JSON', scan['line'])
+                for suffix in ['json', 'txt']:
+                    with self.subTest(suffix=suffix):
+                        saved = (self.out / ('semgrep-raw.' + suffix)).read_text(encoding='utf-8')
+                        self.assertNotIn('abcdefgh123456', saved)
+                        self.assertIn('[redacted]', saved)
+                        self.assertIn('scan diagnostic', saved)
 
     def test_gitleaks_exit_1_without_complete_findings_is_not_checked(self):
         for output in [b'', b'RuleID: fern-token\n', b'File: /src/app/Fern.php\n']:

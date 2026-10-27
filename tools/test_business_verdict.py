@@ -75,6 +75,21 @@ class BusinessVerdictTests(unittest.TestCase):
         self.areas.unlink()
         self.assert_bad(self.run_cli('verdict', '--areas', self.areas))
 
+    def test_n3_passing_area_keeps_draft_notice(self):
+        # Boundaries: exact or embedded draft notice; ordinary or empty reason.
+        for reason, suffix in [
+            ('rules page: draft, not in the repo yet',
+             ', rules page: draft, not in the repo yet'),
+            ('rules kept, rules page: draft, not in the repo yet; checked R1',
+             ', rules page: draft, not in the repo yet'),
+            ('rules kept', ''), ('', ''),
+        ]:
+            with self.subTest(reason=reason):
+                run = self.verdict([dict(area='zindle', state='pass', reason=reason),
+                                    dict(area='floop', state='pass', reason='rules kept')])
+                self.assert_ok(run, 'business: pass, area zindle: every rule kept' + suffix
+                               + '; area floop: every rule kept')
+
     def test_zindle_text_survives_ascii_shell(self):
         self.env['PYTHONIOENCODING'] = 'ascii'
         self.areas.write_text(json.dumps({'areas': [dict(area='žindle', state='fail',

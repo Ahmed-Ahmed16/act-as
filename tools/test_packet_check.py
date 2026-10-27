@@ -252,16 +252,23 @@ class PacketCheckTests(unittest.TestCase):
             dict(area='grove', page='grove.md', commit='e' * 40, rules=[]))
         self.write_inputs()
         areas = self.root / 'business-areas.json'
-        areas.write_text(json.dumps({'areas': [
-            dict(area='orchard', state='pass', reason='rules kept'),
-            dict(area='grove', state='pass', reason='rules kept')]}), encoding='utf-8')
         script = Path(__file__).with_name('business_verdict.py')
-        run = subprocess.run([sys.executable, '-B', str(script), 'verdict', '--areas', str(areas)],
-                             capture_output=True, text=True, encoding='utf-8', timeout=10)
-        self.assertEqual(run.returncode, 0, run.stderr)
-        packet = replace_line(self.rerun_packet(), 'business',
-                              run.stdout.strip().removeprefix('business: '))
-        self.assert_pass(packet)
+        # N3: a draft notice must survive the verdict and the rerun packet check.
+        for reason, suffix in [('rules kept', ''),
+                               ('rules page: draft, not in the repo yet',
+                                ', rules page: draft, not in the repo yet')]:
+            with self.subTest(reason=reason):
+                areas.write_text(json.dumps({'areas': [
+                    dict(area='orchard', state='pass', reason=reason),
+                    dict(area='grove', state='pass', reason='rules kept')]}), encoding='utf-8')
+                run = subprocess.run([sys.executable, '-B', str(script), 'verdict', '--areas', str(areas)],
+                                     capture_output=True, text=True, encoding='utf-8', timeout=10)
+                self.assertEqual(run.returncode, 0, run.stderr)
+                self.assertEqual(run.stdout, 'business: pass, area orchard: every rule kept'
+                                 + suffix + '; area grove: every rule kept\n')
+                packet = replace_line(self.rerun_packet(), 'business',
+                                      run.stdout.strip().removeprefix('business: '))
+                self.assert_pass(packet)
 
     def test_rr6_identity_instruction_produces_valid_rerun_packet(self):
         # G13/G16: apply RR6's identity setting before the packet check.
