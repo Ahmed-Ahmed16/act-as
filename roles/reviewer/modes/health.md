@@ -167,7 +167,7 @@ Before each step, run `cards.py reviewer health <step number>`, for example
     they call, not by a name search alone. None found: write `H11: does not
     apply: no test in a risky area`. This never hides check H6 (risky area with
     no test). Write the picks and the code line to break in a spec file, then
-    run `python tools/check11_run.py --repo <checkout> --spec <spec.json> --out <packet folder>/independent-check --image actas-reviewer:2026-10-26 --record runs/check-record.json --reading-result <word>`.
+    run `python tools/check11_run.py --repo <checkout> --head <head commit> --spec <spec.json> --out <packet folder>/independent-check --image actas-reviewer:2026-10-26 --record runs/check-record.json --reading-result <word>`.
     The tool works only in a throwaway copy, with the network off. It never
     writes to the checkout (`REV-P01`, `REV-P03`); if the checkout changes, it
     stops. Per test, it does these in order: a green run first; proof that the
@@ -313,6 +313,18 @@ The helper is `python tools/guard_run.py`. It decides; you read the result.
    tests go to `test-guard`. Changed docs go to `docs-guard`. All 3 guards are
    report only: they never edit, fix or post. A `must fix` from a guard is only
    as sure as your own reading of the code.
+
+   Read each guard's `SKILL.md` and follow its review steps:
+
+   - Run `clean-code-guard` on its code files in report only mode. Save its
+     output to `runs/clean-code-guard.txt`.
+   - Run `test-guard` on its test files in report only mode. Save its output
+     to `runs/test-guard.txt`.
+   - Run `docs-guard` on its docs files in report only mode. Save its output
+     to `runs/docs-guard.txt`.
+
+   If a guard cannot run, write `not checked: <guard> <reason>` in the check
+   record. Name the guard and say why it could not run.
 3. `debate-review`. Full run only, never in a health only or size only run.
    Run `guard_run.py debate --pr <url> --author <PR author login> --out-dir <packet folder>/debate`.
    It always passes `--dry-run`. Never run `debate-review` by hand, and never

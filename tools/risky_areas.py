@@ -19,13 +19,10 @@ PATTERNS = {kind: re.compile(r'(?<![a-z0-9])(?:' + words + r')(?![a-z0-9])', re.
 def changed_text(repo, filename):
     if Path(filename).is_absolute():
         raise ValueError(f'file is not under repo: {filename}')
-    try:
-        path = (repo / filename).resolve()
-        if not path.is_relative_to(repo):
-            raise ValueError(f'file is not under repo: {filename}')
-        return path.read_text(encoding='utf-8')
-    except (OSError, UnicodeError) as error:
-        raise ValueError(f'cannot read file {filename}: {error}') from error
+    path = (repo / filename).resolve()
+    if not path.is_relative_to(repo):
+        raise ValueError(f'file is not under repo: {filename}')
+    return path.read_text(encoding='utf-8')
 
 
 def file_areas(filename, text):
@@ -47,14 +44,20 @@ def scan(args):
     if not repo.is_dir():
         raise ValueError('repo must be a directory')
     areas = []
+    not_checked = ['business risky areas: not asked: health run only']
     for filename in args.files:
-        areas.extend(file_areas(filename, changed_text(repo, filename)))
+        try:
+            text = changed_text(repo, filename)
+        except (OSError, UnicodeError) as error:
+            not_checked.append(f'cannot read file {filename}: {error}')
+            continue
+        areas.extend(file_areas(filename, text))
     found = {area['kind'] for area in areas}
     return outcome('lead' if areas else 'clean',
                    'candidates only; open the files to judge' if areas else
                    'no risky area words found in the requested files',
                    areas=areas, kinds_found=[kind for kind in PATTERNS if kind in found],
-                   not_checked=['business risky areas: not asked: health run only'])
+                   not_checked=not_checked)
 
 
 def main():

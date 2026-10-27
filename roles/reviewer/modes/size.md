@@ -56,9 +56,11 @@ Before each step, run `cards.py reviewer size <step number>`, for example
    from the diff), Files that matter most (path plus one line why), Not
    checked (a reason on every line, and at least the other three modes),
    Known risks and Pointers (`none` is allowed), Drafts, not sent (the
-   message to the author, never sent). Write the 3 other saved inputs
-   (`check-record.json`, `split-plan.json`, `rules-pages.json`) with empty
-   lists, beside `packet.md`.
+   message to the author, never sent). Write the 3 other saved inputs beside
+   `packet.md` as these empty objects: `check-record.json`:
+   `{"required_ids": [], "entries": []}`; `split-plan.json`:
+   `{"groups": [], "first_group_parts": [], "unplaced": []}`;
+   `rules-pages.json`: `{"areas": []}`.
    Reading and identity line cards: `REV-110` to `REV-113`, `REV-119`,
    `REV-120`.
 
@@ -69,8 +71,9 @@ Before each step, run `cards.py reviewer size <step number>`, for example
    first`, but a size run uses `not asked`). The money line and Tests run are
    as above. Split plan says exactly `not asked: size run only`. Write no
    `group:` line anywhere, in Split plan or in Drafts, not sent. Drafts, not
-   sent says `not asked: size run only`. `split-plan.json`
-   stays an empty list. Nothing in the packet says the PR is fine or safe;
+   sent says `not asked: size run only`. `split-plan.json` stays
+   `{"groups": [], "first_group_parts": [], "unplaced": []}`.
+   Nothing in the packet says the PR is fine or safe;
    say plainly that it is over the cap and was only counted.
 
 6. **Packet check.** Run `python tools/packet_check.py <packet folder>`

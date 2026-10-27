@@ -1,16 +1,16 @@
-import io
 import json
 import os
 import re
 import subprocess
 import sys
-import tarfile
 import tempfile
 from pathlib import Path, PurePosixPath
 
 if __package__:
+    from .scrub import PATTERNS as SCRUB_PATTERNS
     from .size_counter import ArgumentParser, GitError, git_bytes
 else:
+    from scrub import PATTERNS as SCRUB_PATTERNS
     from size_counter import ArgumentParser, GitError, git_bytes
 
 PATTERNS = {
@@ -47,7 +47,10 @@ FETCH = ("import pathlib,sys,urllib.request; "
 
 
 def redact(text):
-    return SECRET.sub('[redacted]', ENV.sub(r"\1'[redacted]'", text))
+    text = SECRET.sub('[redacted]', ENV.sub(r"\1'[redacted]'", text))
+    for _, pattern in SCRUB_PATTERNS:
+        text = pattern.sub('[redacted]', text)
+    return text
 
 
 def save_json(path, report):
@@ -72,6 +75,8 @@ def paths(filename):
 
 
 def pathcheck(expected, scanned):
+    # All configured rules cover PHP, including Blade's .blade.php files.
+    expected = {path for path in expected if path.endswith(('.php', '.phtml', '.tpl'))}
     actual = set(scanned.read_text(encoding='utf-8').splitlines())
     extra, missing = sorted(actual - set(expected)), sorted(set(expected) - actual)
     return 'pathcheck: pass' if not extra and not missing else (
@@ -157,6 +162,21 @@ def semgrep_finding(hit):
     return dict(rule=rule, check=check, path=path, line=line)
 
 
+def semgrep_pathcheck(report, selected, out):
+    reported = report.get('paths', {})
+    if not isinstance(reported, dict):
+        raise ValueError('invalid paths')
+    if 'scanned' not in reported:
+        return 'not checked: semgrep did not report scanned paths'
+    scanned = reported['scanned']
+    if not isinstance(scanned, list) or any(
+            not isinstance(path, str) or any(c in path for c in '\n\r\0') for path in scanned):
+        raise ValueError('invalid scanned paths')
+    path_file = out / 'semgrep-paths.txt'
+    path_file.write_text(''.join(PurePosixPath(path).as_posix() + '\n' for path in scanned), encoding='utf-8')
+    return pathcheck(selected, path_file)
+
+
 def semgrep(options, mounts, selected, runner):
     with tempfile.TemporaryDirectory(prefix='actas-rules-') as folder:
         rules = Path(folder)
@@ -177,20 +197,33 @@ def semgrep(options, mounts, selected, runner):
             if not isinstance(report['results'], list) or report.get('errors'):
                 raise ValueError('invalid results')
             findings = [semgrep_finding(hit) for hit in report['results']]
+            verdict = semgrep_pathcheck(report, selected, options.out)
         except (ValueError, KeyError, TypeError, StopIteration):
             return unchecked('semgrep', 'invalid JSON', completed.returncode)
-        return dict(status='ran', line=f'ran: semgrep, {len(findings)} findings', exit=completed.returncode, findings=findings)
+        checked = verdict == 'pathcheck: pass'
+        return dict(status='ran' if checked else 'not checked',
+                    line=f'ran: semgrep, {len(findings)} findings' if checked else (
+                        verdict if verdict.startswith('not checked:') else 'not checked: semgrep, ' + verdict),
+                    exit=completed.returncode, findings=findings, pathcheck=verdict)
 
 
 def composer_audit(options, mounts, root, runner):
     audit = unchecked('composer audit', 'no composer.lock in the head')
     if (root / 'composer.lock').is_file():
         completed = run(container('composer', mounts) + ['--network', 'bridge', '-e', 'COMPOSER_ALLOW_SUPERUSER=1',
-            '-e', 'COMPOSER_HOME=/tmp/c', '-w', '/src', options.image, 'composer', 'audit', '--locked', '--no-interaction', '--no-cache', '--no-plugins'], runner)
+            '-e', 'COMPOSER_HOME=/tmp/c', '-w', '/src', options.image, 'composer', 'audit', '--locked', '--format=json', '--no-interaction', '--no-cache', '--no-plugins'], runner)
         stdout = raw_output(options.out, 'composer', completed)
         audit = unchecked('composer audit', f'exit {completed.returncode}', completed.returncode)
         if completed.returncode in (0, 1):
-            count = sum(line.startswith('Package:') for line in stdout.splitlines()) if completed.returncode else 0
+            try:
+                advisories = json.loads(stdout)['advisories']
+                if advisories == []:
+                    advisories = {}
+                if not isinstance(advisories, dict) or any(not isinstance(entries, list) for entries in advisories.values()):
+                    raise ValueError('invalid advisories')
+                count = sum(len(entries) for entries in advisories.values())
+            except (ValueError, KeyError, TypeError):
+                return unchecked('composer audit', 'invalid JSON', completed.returncode)
             audit = dict(status='ran', line=f'ran: composer audit, {count} advisories', exit=completed.returncode, advisories=count)
     return audit
 
@@ -213,11 +246,28 @@ def gitleaks(options, mounts, runner):
     return leaks
 
 
+def export_head(repo, revision, root):
+    for record in git_bytes(repo, 'ls-tree', '-r', '-z', revision).split(b'\0'):
+        if not record:
+            continue
+        metadata, name = record.split(b'\t', 1)
+        _, kind, blob = metadata.split()
+        if kind != b'blob':
+            continue
+        path = name.decode('utf-8', 'surrogateescape')
+        if PurePosixPath(path).is_absolute() or '..' in PurePosixPath(path).parts or any(c in path for c in '\\:'):
+            raise ValueError('head has an unsafe path')
+        target = root / path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        # Link blobs stay regular files so scans cannot follow links outside /src.
+        target.write_bytes(git_bytes(repo, 'cat-file', 'blob', blob.decode('ascii')))
+
+
 def tools(options, runner):
     selected = paths(options.files)
     options.out.mkdir(parents=True, exist_ok=True)
     path_file = options.out / 'semgrep-paths.txt'
-    path_file.write_text(''.join(path + '\n' for path in selected), encoding='utf-8')
+    path_file.unlink(missing_ok=True)
     docker = run(['docker', 'version', '--format', '{{.Server.Version}}'], runner)
     if docker.returncode != 0:
         lines = docker.stderr.decode('utf-8', 'replace').strip().splitlines()
@@ -226,19 +276,13 @@ def tools(options, runner):
                     [('semgrep', 'semgrep'), ('composer_audit', 'composer audit'), ('gitleaks', 'gitleaks')]}
         statuses['semgrep']['paths'] = selected
         return dict(image=options.image, tools=statuses)
-    archive = git_bytes(options.repo, 'archive', options.head)
     with tempfile.TemporaryDirectory(prefix='actas-head-') as folder:
         root = Path(folder)
-        with tarfile.open(fileobj=io.BytesIO(archive)) as tree:
-            tree.extractall(root, filter='data')
+        export_head(options.repo, options.head, root)
         mounts = [f'{root}:/src:ro']
         scan = unchecked('semgrep', 'no changed files to scan')
-        if pathcheck(selected, path_file) != 'pathcheck: pass':
-            scan = unchecked('semgrep', 'path list differs from files.json')
-        elif selected:
+        if selected:
             scan = semgrep(options, mounts, selected, runner)
-        if pathcheck(paths(options.files), path_file) != 'pathcheck: pass':
-            scan = unchecked('semgrep', 'path list differs from files.json')
         scan['paths'] = selected
         return dict(image=options.image, tools=dict(semgrep=scan,
                     composer_audit=composer_audit(options, mounts, root, runner), gitleaks=gitleaks(options, mounts, runner)))
@@ -283,7 +327,7 @@ def main(args, runner=subprocess.run):
     except GitError as error:
         print('security_scan: ' + redact(' '.join(str(error).splitlines())), file=sys.stderr)
         return 1
-    except (ValueError, OSError, tarfile.TarError) as error:
+    except (ValueError, OSError) as error:
         print('security_scan: ' + redact(' '.join(str(error).splitlines())), file=sys.stderr)
         return 2
 
