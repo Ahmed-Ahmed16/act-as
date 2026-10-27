@@ -279,6 +279,18 @@ The helper is `python tools/guard_run.py`. It decides; you read the result.
    tests go to `test-guard`. Changed docs go to `docs-guard`. All 3 guards are
    report only: they never edit, fix or post. A `must fix` from a guard is only
    as sure as your own reading of the code.
+
+   Read each guard's `SKILL.md` and follow its review steps:
+
+   - Run `clean-code-guard` on its code files in report only mode. Save its
+     output to `runs/clean-code-guard.txt`.
+   - Run `test-guard` on its test files in report only mode. Save its output
+     to `runs/test-guard.txt`.
+   - Run `docs-guard` on its docs files in report only mode. Save its output
+     to `runs/docs-guard.txt`.
+
+   If a guard cannot run, write `not checked: <guard> <reason>` in the check
+   record. Name the guard and say why it could not run.
 3. `debate-review`. Full run only, never in a health only or size only run.
    Run `guard_run.py debate --pr <url> --author <PR author login> --out-dir <packet folder>/debate`.
    It always passes `--dry-run`. Never run `debate-review` by hand, and never

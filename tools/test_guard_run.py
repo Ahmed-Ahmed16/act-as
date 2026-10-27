@@ -2,6 +2,7 @@
 # Boundaries: unset, missing, empty and comment lists; old and new entries; exit 0 and nonzero.
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -158,7 +159,9 @@ class GuardRunTests(unittest.TestCase):
         expected = ['node', str(folder / 'scripts' / 'review-pr.mjs'), self.pr,
                     '--dry-run', '--out-dir', str(self.out)]
         self.assertEqual(outcome, dict(ran=True, line='ran: debate-review --dry-run',
-                                      command=expected, worktree_removed=True))
+                                      command=expected, worktree_removed=True, exit_code=0,
+                                      stdout_path=str(self.out / 'debate-stdout.txt'),
+                                      stderr_path=str(self.out / 'debate-stderr.txt')))
         self.runner.assert_called_once_with(expected, capture_output=True, text=True)
         for call in self.runner.call_args_list:
             command = call.args[0]
@@ -206,6 +209,30 @@ class GuardRunTests(unittest.TestCase):
                     'not checked: debate-review worktree left behind' if leave_behind
                     else 'not checked: debate-review failed, exit 7')
 
+    # G35: success, failure with stderr, and empty streams must all leave evidence.
+    def test_debate_streams_are_saved_and_returned_with_exit_code(self):
+        scripts = self.install() / 'scripts'
+        scripts.mkdir()
+        fake_debate = scripts / 'review-pr.mjs'
+        cases = [(0, 'review finished\n', 'warning\n'),
+                 (7, 'review started\n', 'cannot load review module\n'), (0, '', '')]
+        for index, (exit_code, stdout, stderr) in enumerate(cases):
+            with self.subTest(exit_code=exit_code, stdout=stdout):
+                fake_debate.write_text(
+                    f'process.stdout.write({json.dumps(stdout)});\n'
+                    f'process.stderr.write({json.dumps(stderr)});\n'
+                    f'process.exitCode = {exit_code};\n', encoding='utf-8')
+                out = self.out / str(index)
+                outcome = self.debate(out_dir=out, runner=subprocess.run)
+                self.assertTrue(outcome['ran'], outcome['line'])
+                self.assertIn('exit_code', outcome)
+                self.assertEqual(outcome['exit_code'], exit_code)
+                for key, expected in (('stdout_path', stdout), ('stderr_path', stderr)):
+                    self.assertIn(key, outcome)
+                    saved = Path(outcome[key])
+                    self.assertEqual(saved.parent, out)
+                    self.assertEqual(saved.read_text(encoding='utf-8'), expected)
+
     def test_default_tmp_directory_and_skills_environment_are_used(self):
         self.install()
         with patch.object(tempfile, 'gettempdir', return_value=str(self.tmp)):
@@ -250,6 +277,22 @@ class GuardRunTests(unittest.TestCase):
                 self.assertEqual(completed.returncode, 2)
                 self.assertEqual(completed.stdout, '')
                 self.assertTrue(completed.stderr)
+
+
+class GuardInstructionsTests(unittest.TestCase):
+    # G34: this checks the written contract, not whether an agent follows it.
+    def test_health_requires_guard_runs_saved_reports_and_unavailable_record(self):
+        health = Path(__file__).resolve().parents[1] / 'roles/reviewer/modes/health.md'
+        block = health.read_text(encoding='utf-8').split(
+            '## Guard skills and debate-review (ticket 37)', 1)[1].split(
+            '## Finish checklist', 1)[0]
+        block = re.sub(r'\s+', ' ', block)
+        for guard in ('clean-code-guard', 'test-guard', 'docs-guard'):
+            with self.subTest(guard=guard):
+                self.assertRegex(block, rf'Run `{guard}`[^.]*report only')
+                self.assertIn(f'`runs/{guard}.txt`', block)
+        self.assertRegex(block, r'cannot run[^.]*`not checked: <guard> <reason>`'
+                                r'[^.]*check record')
 
 
 if __name__ == '__main__':
