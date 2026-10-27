@@ -6,6 +6,9 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
+
+import health_search
 
 
 class HealthSearchTests(unittest.TestCase):
@@ -104,7 +107,8 @@ class HealthSearchTests(unittest.TestCase):
                                  'resource lines count as 1; the real route count is higher')
 
     def test_acme_new_lists_and_limits_name_both_paths_with_lines(self):
-        for literal in ("['Acme', 'Card']", '5120'):
+        # N4 cases: 1 character, 2 digits, whitespace, longer fixed text.
+        for literal in ("['Acme', 'Card']", '5120', '64', '10', '1', ' '):
             with self.subTest(literal=literal):
                 self.write('app/Card.php', '\n' + literal + '\n')
                 self.write('config/shop.php', '')
@@ -200,6 +204,13 @@ class HealthSearchTests(unittest.TestCase):
         self.assertEqual(document['summary'][0]['copy_count'], 1)
         self.assertEqual(document['summary'][0]['new_copies'], 0)
 
+    def test_acme_empty_multiline_and_nul_literals_are_rejected(self):
+        # NUL cannot be passed through subprocess arguments.
+        for literal in ('', '64\n10', '64\r10', '64\0'):
+            with self.subTest(literal=literal):
+                with self.assertRaises(ValueError):
+                    health_search.copies(SimpleNamespace(literal=['64', literal]))
+
     def test_acme_bad_paths_refs_literals_and_arguments_have_1_error_line(self):
         self.write('app/Card.php', 'Acme')
         head = self.commit()
@@ -212,7 +223,7 @@ class HealthSearchTests(unittest.TestCase):
                      ('copies', '--repo', self.repo, '--base', head, '--head', 'Acme',
                       '--literal', '5120'),
                      ('copies', '--repo', self.repo, '--base', head, '--head', head,
-                      '--literal', '12')]:
+                      '--literal', '')]:
             with self.subTest(args=args):
                 run = self.run_cli(*args)
                 self.assertEqual(run.returncode, 2, run.stderr)
