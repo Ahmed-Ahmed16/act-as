@@ -163,8 +163,8 @@ carry `docs_version`, `checked_same` and `differs_on`.
 | REV-352 | security, full | When a change makes an outside call that has an effect | approved | L1 | A database transaction does not make an outside charge safe. Use the provider's... |
 | REV-353 | security, full | When a change checks a value and then updates it | approved | L1 | 2 requests at the same time must not both pass a check and then both update.... |
 | REV-354 | security, full | When a change adds a step that should happen once | approved | L1 | A step that may run only once must fail when it is sent again. Mark the step... |
-| REV-356 | security, full | When a changed file sets the session cookie domain | draft | S13 | A session cookie's domain stays null, so only the host that set it gets the cookie... |
-| REV-357 | security, full | When a changed file sets the session lifetime | draft | S13 | The session lifetime is set to what the project says it needs, not longer... |
+| REV-356 | security, full | When a changed file sets the session cookie domain | approved | S13 | A session cookie's domain stays null, so only the host that set it gets the cookie... |
+| REV-357 | security, full | When a changed file sets the session lifetime | approved | S13 | The session lifetime is set to what the project says it needs, not longer... |
 
 ## Health check cards
 
