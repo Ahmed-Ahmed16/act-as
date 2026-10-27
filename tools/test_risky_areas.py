@@ -103,17 +103,37 @@ class RiskyAreasTests(unittest.TestCase):
             with self.subTest(filename=filename), self.assertRaises(ValueError):
                 self.scan(filename)
 
-    def test_missing_directory_and_invalid_utf8_raise_value_error(self):
+    def test_unreadable_files_are_reported_without_losing_readable_results(self):
+        # G32: missing, directory, binary; readable files before and after each skip.
         (self.repo / 'glorp.txt').write_bytes(b'\xff')
+        self.write('before.php', 'price')
+        self.write('after.php', 'password')
         for filename in ('missing.txt', '.', 'glorp.txt'):
-            with self.subTest(filename=filename), self.assertRaises(ValueError):
-                self.scan(filename)
+            with self.subTest(filename=filename):
+                run = subprocess.run([sys.executable, '-B', str(self.script), '--repo',
+                                      str(self.repo), '--files', 'before.php', filename,
+                                      'after.php'], capture_output=True, text=True,
+                                     encoding='utf-8')
+                self.assertEqual(run.returncode, 0, run.stderr)
+                self.assertEqual(run.stderr, '')
+                document = json.loads(run.stdout)
+                self.assertEqual(document['result'], 'lead')
+                self.assertEqual(document['areas'], [
+                    dict(kind='money', file='before.php', line=1, evidence='price'),
+                    dict(kind='logins', file='after.php', line=1, evidence='password')])
+                self.assertEqual(document['kinds_found'], ['money', 'logins'])
+                self.assertEqual(len(document['not_checked']), 2)
+                self.assertTrue(document['not_checked'][1].startswith(
+                    f'cannot read file {filename}: '))
 
-    def test_unreadable_file_raises_value_error(self):
+    def test_permission_denied_file_is_reported_as_not_checked(self):
         self.write('glorp.txt', 'price')
         with patch.object(Path, 'read_text', side_effect=PermissionError('Zindle denied')):
-            with self.assertRaises(ValueError):
-                self.scan('glorp.txt')
+            document = risky_areas.scan(SimpleNamespace(repo=self.repo, files=['glorp.txt']))
+        self.assertEqual(document['areas'], [])
+        self.assertEqual(document['not_checked'], [
+            'business risky areas: not asked: health run only',
+            'cannot read file glorp.txt: Zindle denied'])
 
     def test_cli_returns_json_and_exit_0(self):
         self.write('glorp.php', '$price = 3;\n')
@@ -129,7 +149,8 @@ class RiskyAreasTests(unittest.TestCase):
                          ['business risky areas: not asked: health run only'])
 
     def test_cli_bad_input_returns_exit_2_without_json(self):
-        for args in ([], ['--repo', str(self.repo), '--files', 'missing.txt']):
+        for args in ([], ['--repo', str(self.repo / 'missing'), '--files', 'glorp.txt'],
+                     ['--repo', str(self.repo), '--files', '../outside.txt']):
             with self.subTest(args=args):
                 run = subprocess.run([sys.executable, '-B', str(self.script), *args],
                                      capture_output=True, text=True, encoding='utf-8')

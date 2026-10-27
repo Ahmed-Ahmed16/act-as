@@ -190,7 +190,7 @@ Before each one, run `cards.py reviewer business <step number>`, for example
    `not checked` stays as it is. Whether a page "says who may do what" is a
    reading call (open question O10): state your reason in 1 line.
    Rerun security line card: `REV-237`.
-25. **RR6. Add the rerun line.** Under the verdict lines add
+25. **RR6. Add the rerun line.** Set `rerun=yes` in the identity line. Under the verdict lines add
    `business rerun for <area>, <YYYY-MM-DD>, head <full head sha>`. Run the
    packet check again (step 9) and show the packet after it passes. The size
    and health lines stay as they were.

@@ -54,7 +54,7 @@ def dynamic_prefix(parts):
 
 
 def replacements_escaped(name, parts):
-    offset = 2 if name == 'trans_choice' else 1
+    offset = 2 if name in ('trans_choice', 'Lang::choice') else 1
     if len(parts) <= offset:
         return True
     replacement = parts[offset]
@@ -166,7 +166,7 @@ def blade_pointers(masked, calls, directives, relative):
     for match in re.finditer(r'\{!!.*?!!\}', masked, re.S):
         raw.extend({key: call[key] for key in ('path', 'line', 'key', 'args_escaped')}
                    for call in calls if match.start() <= call['position'] < match.end()
-                   and call['name'] in ('__', 'trans', 'trans_choice', '@lang'))
+                   and call['name'] in TRANSLATORS)
     for start, end in reversed(directives):
         masked = masked[:start] + re.sub(r'[^\n]', ' ', masked[start:end]) + masked[end:]
     hidden = r'''\{\{--.*?--\}\}|<!--.*?-->|<script\b.*?</script\s*>|<style\b.*?</style\s*>|<\?.*?\?>|@php\b.*?@endphp|\{\{.*?\}\}|\{!!.*?!!\}|@\w+|<(?:"[^"]*"|'[^']*'|[^'">])*>'''

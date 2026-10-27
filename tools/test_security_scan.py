@@ -33,8 +33,6 @@ class DockerRunner:
             return subprocess.CompletedProcess(argv, failure, b'28.0\n',
                                                self.settings.get('stderr', b''))
         if 'python3' in argv:
-            if self.settings.get('corrupt_paths'):
-                self.settings['corrupt_paths'].write_text('unlisted.php\n', encoding='utf-8')
             mount = argv[argv.index('-v') + 1]
             self.rules_dir = Path(mount.rsplit(':/rules', 1)[0])
             for rule in argv[argv.index('python3') + 3:]:
@@ -47,11 +45,15 @@ class DockerRunner:
             self.snapshot = (Path(source) / 'app/Fern.php').read_text(encoding='utf-8')
             payload = self.settings.get('payload', json.dumps({'results': [{
                 'check_id': EXEC_RULE, 'path': 'app/Fern.php', 'start': {'line': 3},
-                'extra': {'lines': 'exec($fern);'}}]}).encode())
+                'extra': {'lines': 'exec($fern);'}}],
+                'paths': {'scanned': ['app/Fern.php']}}).encode())
             return subprocess.CompletedProcess(argv, self.settings.get('semgrep', 1), payload, b'')
         if 'composer' in argv:
+            advisories = {'fern/leaf': [{'advisoryId': f'PKSA-fern-{n}'} for n in range(18)]}
+            payload = json.dumps({'advisories': advisories if self.settings.get('composer') == 1 else [],
+                                  'abandoned': {}}).encode()
             return subprocess.CompletedProcess(argv, self.settings.get('composer', 0),
-                                               b'Package: fern/leaf\n' * 18, b'')
+                self.settings.get('composer_payload', payload), b'')
         if 'gitleaks' in argv:
             return subprocess.CompletedProcess(argv, self.settings.get('gitleaks', 1),
                 self.settings.get('leak_output',
@@ -249,6 +251,91 @@ class SecurityScanTests(unittest.TestCase):
         self.assertNotIn(key, json.dumps(report))
         self.assertNotIn(token, json.dumps(report))
 
+    def test_review_g21_scrub_shapes_are_masked_in_saved_hit_text(self):
+        secrets = ['sk-ant-api03-' + 'a' * 40, 'ASIA' + 'B' * 16,
+                   'github_pat_' + 'c' * 30, 'sk-proj-' + 'd' * 40,
+                   'AIza' + 'E' * 35, 'xoxb-' + 'f' * 20,
+                   'eyJ' + 'g' * 12 + '.eyJ' + 'h' * 12 + '.' + 'i' * 12,
+                   'api_key = "' + 'j' * 16 + '"',
+                   'D:' + '\\Users\\fern\\site', 'fern' + '@' + 'leaf.invalid']
+        self.write('app/Leaf.php', '\n'.join('Log::info(' + s + ');' for s in secrets))
+        self.head = self.commit()
+        report = self.finders()
+        texts = [hit['text'] for hit in report['hits'] if hit['path'] == 'app/Leaf.php']
+        expected = ['Log::info([redacted]);'] * len(secrets)
+        expected[8] = 'Log::info([redacted]fern\\site);'
+        self.assertEqual([text.rstrip('\r') for text in texts], expected)
+        saved = (self.out / 'security-finders.json').read_text(encoding='utf-8')
+        for secret in secrets:
+            self.assertNotIn(secret, saved)
+
+    def test_review_g22_export_attributes_do_not_omit_or_rewrite_blobs(self):
+        cases = [('export-ignore', '<?php\nexec($fern);\n'),
+                 ('export-subst', '<?php\n// $Format:%H$\nexec($fern);\n')]
+        for attribute, contents in cases:
+            with self.subTest(attribute=attribute):
+                self.write('.gitattributes', 'app/Fern.php ' + attribute + '\n')
+                self.write('app/Fern.php', contents)
+                self.head = self.commit()
+                runner = DockerRunner()
+                self.tools(runner)
+                self.assertEqual(getattr(runner, 'snapshot', None), contents)
+
+    def test_review_g23_skipped_php_is_not_checked(self):
+        self.write('app/Leaf.php', '<?php\nexec($leaf);\n')
+        self.head = self.commit()
+        self.file_rows([('app/Fern.php', 'modified'), ('app/Leaf.php', 'added'),
+                        ('composer.lock', 'modified')])
+        payload = json.dumps({'results': [], 'paths': {'scanned': ['app/Fern.php']}}).encode()
+        scan = self.tools(DockerRunner(semgrep=0, payload=payload))['tools']['semgrep']
+        self.assertEqual(scan['status'], 'not checked')
+        self.assertIn('missing: app/Leaf.php', scan['line'])
+
+    def test_review_g23_reported_paths_distinguish_missing_invalid_and_complete(self):
+        # PHP rules do not cover the lock file. Empty and absent paths differ.
+        cases = [(None, 'not checked', 'not checked: semgrep did not report scanned paths'),
+                 ({'scanned': []}, 'not checked', 'missing: app/Fern.php'),
+                 ({'scanned': 'app/Fern.php'}, 'not checked', 'invalid JSON'),
+                 ({'scanned': [7]}, 'not checked', 'invalid JSON'),
+                 ({'scanned': ['app/Fern.php\napp/Fern.php']}, 'not checked', 'invalid JSON'),
+                 ({'scanned': ['./app/Fern.php']}, 'ran', 'pathcheck: pass')]
+        for reported, status, message in cases:
+            with self.subTest(reported=reported):
+                payload = {'results': []}
+                if reported is not None:
+                    payload['paths'] = reported
+                scan = self.tools(DockerRunner(semgrep=0, payload=json.dumps(payload).encode()))['tools']['semgrep']
+                self.assertEqual(scan['status'], status)
+                self.assertIn(message, scan.get('pathcheck', scan['line']))
+
+    def test_review_g23_php_templates_require_scan_coverage(self):
+        for name in ['app/Leaf.blade.php', 'app/Leaf.phtml', 'app/Leaf.tpl']:
+            self.write(name, '<?php exec($leaf);\n')
+        self.head = self.commit()
+        self.file_rows([(name, 'added') for name in
+                        ['app/Fern.php', 'app/Leaf.blade.php', 'app/Leaf.phtml', 'app/Leaf.tpl', 'composer.lock']])
+        scan = self.tools(DockerRunner())['tools']['semgrep']
+        self.assertEqual(scan['status'], 'not checked')
+        self.assertIn('missing: app/Leaf.blade.php, app/Leaf.phtml, app/Leaf.tpl', scan['pathcheck'])
+
+    def test_review_g24_composer_counts_json_advisories_by_package(self):
+        payload = json.dumps({'advisories': {
+            'fern/leaf': [{'advisoryId': 'PKSA-fern-1'}, {'advisoryId': 'PKSA-fern-2'}],
+            'fern/stem': [{'advisoryId': 'PKSA-fern-3'}]}, 'abandoned': {}}).encode()
+        runner = DockerRunner(composer=1, composer_payload=payload)
+        audit = self.tools(runner)['tools']['composer_audit']
+        self.assertEqual((audit['status'], audit['advisories']), ('ran', 3))
+        command = next(argv for argv in runner.calls if 'composer' in argv)
+        self.assertIn('--format=json', command)
+
+    def test_review_g24_invalid_audit_json_is_not_checked(self):
+        for payload in [b'not json', b'{}', b'{"advisories": null}',
+                        b'{"advisories": {"fern/leaf": {}}}']:
+            with self.subTest(payload=payload):
+                audit = self.tools(DockerRunner(composer_payload=payload))['tools']['composer_audit']
+                self.assertEqual(audit['status'], 'not checked')
+                self.assertIn('invalid JSON', audit['line'])
+
     def test_diffs_do_not_execute_checkout_textconverters(self):
         self.base = self.head
         self.write('.gitattributes', '*.php diff=fern\n')
@@ -279,7 +366,7 @@ class SecurityScanTests(unittest.TestCase):
         self.assertEqual(semgrep['findings'],
             [dict(rule=EXEC_RULE, check='S14', path='app/Fern.php', line=3)])
         self.assertEqual(semgrep['paths'], ['app/Fern.php', 'composer.lock'])
-        self.assertEqual((self.out / 'semgrep-paths.txt').read_text(), 'app/Fern.php\ncomposer.lock\n')
+        self.assertEqual((self.out / 'semgrep-paths.txt').read_text(), 'app/Fern.php\n')
         self.assertEqual(json.loads((self.out / 'semgrep-raw.json').read_text())['results'][0]['check_id'],
                          EXEC_RULE)
         self.assertEqual(report['tools']['gitleaks']['findings'],
@@ -335,11 +422,13 @@ class SecurityScanTests(unittest.TestCase):
         self.assertEqual(report['tools']['semgrep']['findings'],
                          [dict(rule=rule, check='S14', path='app/Fern.php', line=3)])
 
-    def test_written_path_list_is_checked_again_after_scan(self):
-        runner = DockerRunner(corrupt_paths=self.out / 'semgrep-paths.txt')
+    def test_unlisted_scanned_path_is_not_checked(self):
+        payload = json.dumps({'results': [], 'paths': {'scanned': ['unlisted.php']}}).encode()
+        runner = DockerRunner(payload=payload)
         report = self.tools(runner)
-        self.assertEqual(report['tools']['semgrep']['line'],
-                         'not checked: semgrep did not run, path list differs from files.json')
+        self.assertEqual(report['tools']['semgrep']['status'], 'not checked')
+        self.assertEqual(report['tools']['semgrep']['pathcheck'],
+                         'pathcheck: fail, extra: unlisted.php, missing: app/Fern.php')
 
     def test_raw_tail_masks_the_whole_secret_before_cutting(self):
         token = 'ghp_' + 'T' * 24
