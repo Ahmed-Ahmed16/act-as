@@ -1,6 +1,7 @@
 import re
 import subprocess
 import sys
+from collections import Counter
 from pathlib import Path
 
 from health_parse import ArgumentParser, outcome, run_cli
@@ -56,12 +57,16 @@ def copies(args):
             .decode('ascii').strip() for ref in (args.base, args.head)]
     literals, summaries = [], []
     for literal in args.literal:
-        base_paths = {path for path, _ in occurrences(args.repo, refs[0], literal)}
-        rows = [dict(path=path, line=line, at_base=path in base_paths,
-                     in_config=path.startswith('config/'),
-                     in_lang=path.startswith(('lang/', 'resources/lang/')),
-                     in_test=path.startswith('tests/'))
-                for path, line in occurrences(args.repo, refs[1], literal)]
+        base_counts = Counter(path for path, _ in occurrences(args.repo, refs[0], literal))
+        rows = []
+        for path, line in occurrences(args.repo, refs[1], literal):
+            at_base = base_counts[path] > 0
+            if at_base:
+                base_counts[path] -= 1
+            rows.append(dict(path=path, line=line, at_base=at_base,
+                             in_config=path.startswith('config/'),
+                             in_lang=path.startswith(('lang/', 'resources/lang/')),
+                             in_test=path.startswith('tests/')))
         count = sum(not row['in_test'] for row in rows)
         new = sum(not row['at_base'] and not row['in_test'] for row in rows)
         summary = dict(literal=literal, copy_count=count, new_copies=new,
