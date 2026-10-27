@@ -1,4 +1,5 @@
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -153,6 +154,35 @@ class PacketCheckTests(unittest.TestCase):
         packet = replace_line(single_packet('size'), 'size', 'fail, 120 counted lines')
         self.assert_pass(replace_body(packet, 'Split plan', 'not asked: size run only'))
 
+    def test_g14_size_mode_saved_examples_pass_packet_check(self):
+        mode = Path(__file__).resolve().parents[1] / 'roles/reviewer/modes/size.md'
+        instructions = mode.read_text(encoding='utf-8')
+        common, over_cap = instructions.split('**Over the cap (', 1)
+        pattern = r'`([\w-]+\.json)`(?:\s*:|\s+stays)\s*`([^`]+)`'
+        examples = dict(re.findall(pattern, common))
+        # G14: execute the saved examples at both sides of the cap.
+        for total, verdict in [(301, 'fail'), (300, 'pass')]:
+            with self.subTest(total=total):
+                saved = dict(examples)
+                if verdict == 'fail':
+                    overrides = dict(re.findall(pattern, over_cap))
+                    saved['split-plan.json'] = overrides.get('split-plan.json', '[]')
+                # The old instruction says empty lists when no object is shown.
+                for filename in ['check-record.json', 'split-plan.json', 'rules-pages.json']:
+                    self.inputs[filename] = json.loads(saved.get(filename, '[]'))
+                file = self.inputs['files.json']['files'][0]
+                file.update(counted_lines=total, hunks=[{'id': 'h1', 'counted_lines': total}])
+                self.write_inputs()
+                packet = replace_line(single_packet('size'), 'size',
+                                      f'{verdict}, {total} counted lines, cap 300')
+                packet = replace_body(packet, 'Tests run', 'not asked: size run only')
+                plan = ('not asked: size run only' if verdict == 'fail'
+                        else f'not needed: {total} counted lines, cap 300')
+                packet = replace_body(packet, 'Split plan', plan)
+                if verdict == 'fail':
+                    packet = replace_body(packet, 'Drafts, not sent', 'not asked: size run only')
+                self.assert_pass(packet)
+
     def test_single_size_over_cap_not_checked_passes(self):
         packet = replace_line(single_packet('size'), 'size', 'fail, 120 counted lines')
         for field in ['business', 'security', 'health']:
@@ -215,6 +245,33 @@ class PacketCheckTests(unittest.TestCase):
 
     def test_rerun_packet_passes(self):
         self.assert_pass(self.rerun_packet())
+
+    def test_generated_all_pass_verdict_passes_rerun_packet_check(self):
+        # G10/G15: the generated verdict must name every saved area.
+        self.inputs['rules-pages.json']['areas'].append(
+            dict(area='grove', page='grove.md', commit='e' * 40, rules=[]))
+        self.write_inputs()
+        areas = self.root / 'business-areas.json'
+        areas.write_text(json.dumps({'areas': [
+            dict(area='orchard', state='pass', reason='rules kept'),
+            dict(area='grove', state='pass', reason='rules kept')]}), encoding='utf-8')
+        script = Path(__file__).with_name('business_verdict.py')
+        run = subprocess.run([sys.executable, '-B', str(script), 'verdict', '--areas', str(areas)],
+                             capture_output=True, text=True, encoding='utf-8', timeout=10)
+        self.assertEqual(run.returncode, 0, run.stderr)
+        packet = replace_line(self.rerun_packet(), 'business',
+                              run.stdout.strip().removeprefix('business: '))
+        self.assert_pass(packet)
+
+    def test_rr6_identity_instruction_produces_valid_rerun_packet(self):
+        # G13/G16: apply RR6's identity setting before the packet check.
+        mode = Path(__file__).resolve().parents[1] / 'roles/reviewer/modes/business.md'
+        rr6 = mode.read_text(encoding='utf-8').split('RR6.', 1)[1].split('\n## ', 1)[0]
+        settings = re.findall(r'`(rerun=[^`]+)`', rr6)
+        packet = self.rerun_packet().replace('; rerun=yes', '')
+        if settings:
+            packet = packet.replace('date=2026-10-26', 'date=2026-10-26; ' + settings[0])
+        self.assert_pass(packet)
 
     def test_full_size_counts_missing(self):
         self.assert_rules(replace_line(good_packet(), 'size', 'pass'), 'full-size-counts')
@@ -545,6 +602,16 @@ class PacketCheckTests(unittest.TestCase):
         self.write_inputs()
         self.assert_pass(replace_body(single_packet(), 'Split plan', 'Separate cart and account changes.'))
 
+    def test_split_plan_not_needed_requires_a_reason_g6(self):
+        # Boundaries: empty, spaces, tabs, newlines, and a real reason.
+        for body in ['not needed:', 'not needed:   ', 'not needed:\t',
+                     'not needed:\n \t']:
+            with self.subTest(body=body):
+                self.assert_rule(replace_body(good_packet(), 'Split plan', body),
+                                 'missing-part', 'missing content: Split plan')
+        self.assert_pass(replace_body(good_packet(), 'Split plan',
+                                     'not needed: The change fits together.'))
+
     def test_not_checked_empty_reports_only_its_own_rule(self):
         for body in ['', ' \n\t']:
             with self.subTest(body=body):
@@ -570,6 +637,18 @@ class PacketCheckTests(unittest.TestCase):
         self.assert_rule(packet, 'unknown-unmatched', 'unmatched unknowns: fee')
         self.assert_pass(replace_body(packet, 'Not checked',
                                      '___ (tax): Missing rule.\n___ (fee): Missing owner.'))
+
+    def test_unknown_placeholder_reasons_are_unmatched_g7(self):
+        # Boundaries: empty answers, case, padding, and bare or labelled markers.
+        for reason, labels in [('unknown', 'tax'), ('not checked', 'tax'),
+                               ('not checked:', 'tax'), ('none', 'tax'),
+                               (' UNKNOWN \t', 'tax'), ('___', 'bare ___, tax'),
+                               ('___ (reason)', 'tax')]:
+            with self.subTest(reason=reason):
+                packet = replace_body(good_packet(), 'Not checked', '___ (tax): ' + reason)
+                self.assert_rule(packet, 'unknown-unmatched', 'unmatched unknowns: ' + labels)
+        self.assert_pass(replace_body(good_packet(), 'Not checked',
+                                     '___ (tax): The owner has not supplied the tax rule.'))
 
     def test_safe_to_merge_rejects_substrings_and_case(self):
         for phrase in ['safe to merge', 'SAFE TO MERGE', 'unsafe to merge']:
@@ -764,6 +843,45 @@ class PacketCheckTests(unittest.TestCase):
                 self.inputs[filename][key] = ['bad']
                 self.write_inputs()
                 self.assert_bad_input(self.packet)
+
+    # G8 boundaries: numeric text, float, bool, null, list, object;
+    # file and hunk counts, hunk ids, grouped ids, and unplaced ids.
+    def test_saved_counts_require_integers(self):
+        for location in ['files[0]', 'files[0].hunks[0]']:
+            for bad in ['70', 70.0, True, None, [], {}]:
+                with self.subTest(location=location, bad=bad):
+                    self.inputs = good_inputs()
+                    file = self.inputs['files.json']['files'][0]
+                    target = file if location == 'files[0]' else file['hunks'][0]
+                    target['counted_lines'] = bad
+                    self.write_inputs()
+                    run = self.run_check(self.packet)
+                    self.assertEqual(run.returncode, 2, run.stdout + run.stderr)
+                    self.assertEqual(run.stdout, '')
+                    self.assertEqual(run.stderr.splitlines(), [
+                        f'packet_check: files.json.{location}.counted_lines must be int'])
+
+    def test_saved_hunk_ids_require_strings(self):
+        cases = [('files.json', 'files[0].hunks[0].id'),
+                 ('split-plan.json', 'groups[0].hunks[0]'),
+                 ('split-plan.json', 'unplaced[0]')]
+        for filename, location in cases:
+            for bad in [{}, [], None, 7, True]:
+                with self.subTest(filename=filename, location=location, bad=bad):
+                    self.inputs = good_inputs()
+                    packet = self.split_packet()
+                    if filename == 'files.json':
+                        self.inputs[filename]['files'][0]['hunks'][0]['id'] = bad
+                    elif location.startswith('groups'):
+                        self.inputs[filename]['groups'][0]['hunks'] = [bad]
+                    else:
+                        self.inputs[filename]['unplaced'] = [bad]
+                    self.write_inputs()
+                    run = self.check_text(packet)
+                    self.assertEqual(run.returncode, 2, run.stdout + run.stderr)
+                    self.assertEqual(run.stdout, '')
+                    self.assertEqual(run.stderr.splitlines(), [
+                        f'packet_check: {filename}.{location} must be str'])
 
     def test_nested_json_lists_and_object_entries_require_shapes(self):
         for key in ['hunks', 'rules', 'entry_points']:

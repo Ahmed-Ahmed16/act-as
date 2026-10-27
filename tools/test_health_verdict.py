@@ -1,4 +1,5 @@
-# Cases: pass, fail, missing ids, unchecked ids, pointers, invalid records.
+# Cases: pass without G4, fail, missing H11 or translation ids, unchecked ids,
+# pointers, invalid records.
 import json
 import subprocess
 import sys
@@ -13,9 +14,10 @@ class HealthVerdictTests(unittest.TestCase):
         self.addCleanup(self.tree.cleanup)
         self.record = Path(self.tree.name) / 'shop.json'
         self.script = Path(__file__).with_name('health_verdict.py')
-        self.entries = [dict(id=f'H{n}', mode='health', tool_result='clean',
+        self.entries = [dict(id=name, mode='health', tool_result='clean',
                              reading_result='clean', word='none', reason='Acme')
-                        for n in range(1, 11)]
+                        for name in [f'H{n}' for n in range(1, 12)] +
+                                    [f'T{n}' for n in range(1, 9)]]
 
     def run_cli(self, *args):
         return subprocess.run([sys.executable, '-B', str(self.script), *map(str, args)],
@@ -52,11 +54,20 @@ class HealthVerdictTests(unittest.TestCase):
                          ([], [], 0))
 
     def test_acme_missing_default_and_added_ids_are_incomplete(self):
-        self.entries.pop()
+        self.entries = [entry for entry in self.entries if entry['id'] != 'H10']
         self.entries[0]['mode'] = 'Acme'
         document = self.document(['Card'])
         self.assertEqual(document['verdict'], 'incomplete')
         self.assertEqual(document['missing'], ['H1', 'H10', 'Card'])
+
+    def test_acme_missing_h11_or_translation_is_incomplete(self):
+        complete = self.entries
+        for missing in ('H11', 'T1', 'T3', 'T8'):
+            with self.subTest(missing=missing):
+                self.entries = [entry for entry in complete if entry['id'] != missing]
+                document = self.document()
+                self.assertEqual(document['verdict'], 'incomplete')
+                self.assertEqual(document['missing'], [missing])
 
     def test_acme_unchecked_tool_or_reading_is_incomplete(self):
         for field in ('tool_result', 'reading_result'):
@@ -70,7 +81,7 @@ class HealthVerdictTests(unittest.TestCase):
     def test_acme_must_fix_fails_and_retains_other_reasons(self):
         self.entries[0]['word'] = 'must fix'
         self.entries[1]['reading_result'] = 'not checked'
-        self.entries.pop()
+        self.entries = [entry for entry in self.entries if entry['id'] != 'H10']
         document = self.document()
         self.assertEqual(document['verdict'], 'fail')
         self.assertEqual(document['missing'], ['H10'])

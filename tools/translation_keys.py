@@ -9,6 +9,7 @@ locales_not_checked_for_letters, and changed_old_values (shared string keys).
 --base-lang requires --report values; without it changed_old_values is empty.
 Nonstring values and PHP expressions have no text and skip value checks.
 Exit 0 prints a report. Bad input exits 2 with 1 stderr line and no stdout.
+Package translations under lang/vendor are out of scope.
 """
 
 import argparse
@@ -79,7 +80,7 @@ class PhpArray:
         return set(self.array_values())
 
     def array_values(self):
-        # Cases: empty arrays, leaves, nested arrays, trailing commas, missing delimiters.
+        # Cases: empty arrays, lists, mixed keys, nesting, trailing commas, missing delimiters.
         opening = self.take()
         if opening.lower() == 'array':
             self.expect('(')
@@ -87,9 +88,19 @@ class PhpArray:
             raise ValueError('expected array')
         closing = ')' if opening.lower() == 'array' else ']'
         leaves = {}
+        # PHP 8.3 also advances from a first negative integer key.
+        next_index = None
         while self.peek() != closing:
-            key = php_key(self.take())
-            self.expect('=>')
+            if self.position + 1 < len(self.tokens) and self.tokens[self.position + 1] == '=>':
+                key = php_key(self.take())
+                self.expect('=>')
+                if re.fullmatch(r'0|-?[1-9]\d*', key) and (next_index is None or int(key) >= next_index):
+                    next_index = int(key) + 1
+            else:
+                if next_index is None:
+                    next_index = 0
+                key = str(next_index)
+                next_index += 1
             if self.peek() == '[' or self.peek().lower() == 'array':
                 leaves.update((key + '.' + child, text) for child, text in self.array_values().items())
             else:
@@ -157,7 +168,7 @@ def raise_walk_error(error):
 def translation_files(lang):
     locales, files = set(), []
     for path in sorted(lang.iterdir()):
-        if path.is_dir():
+        if path.is_dir() and path.name != 'vendor':
             locales.add(path.name)
             for folder, _, names in os.walk(path, onerror=raise_walk_error):
                 for name in sorted(names):
@@ -205,9 +216,14 @@ def changed_paths(path):
 
 
 def touched_file(shape, filename, locales, changed):
-    candidates = [locale + '.json' for locale in locales] if shape == 'json' else [filename]
-    return 'yes' if any(path == suffix or path.endswith('/' + suffix)
-                        for path in changed for suffix in candidates) else 'no'
+    relative_paths = ([locale + '.json' for locale in locales] if shape == 'json'
+                      else [locale + '/' + filename for locale in locales])
+    candidates = set(relative_paths)
+    if shape == 'php':
+        candidates.add(filename)
+    lang_paths = ['lang/' + path for path in relative_paths]
+    return 'yes' if any(path in candidates or path == lang_path or path.endswith('/' + lang_path)
+                        for path in changed for lang_path in lang_paths) else 'no'
 
 
 def read_translations(lang):

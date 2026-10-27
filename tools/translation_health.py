@@ -46,7 +46,7 @@ def rendered_views(text):
             continue
         context = [part for part, _ in tokens[max(0, index - 3):index]]
         if context != ['View', '::', 'make'] and not (
-                context[-1:] == ['view'] and context[-2:-1] not in (['->'], ['::'], ['$'])):
+                context[-1:] == ['view'] and context[-2:-1] not in (['::'], ['$'])):
             continue
         parts, _ = arguments(tokens, index)
         names.add(literal(parts[0]) if parts else None)
@@ -121,6 +121,8 @@ def main(args):
             parser.error('repo must be a readable directory')
         next(repo.iterdir(), None)
         lang = options.lang.resolve() if options.lang is not None else repo / 'lang'
+        if options.lang is None and not lang.is_dir():
+            lang = repo / 'resources/lang'
         extra = [part for flag, path in (('--changed-files', options.changed_files), ('--base-lang', options.base_lang))
                  if path is not None for part in (flag, path)]
         report = keys_report(lang, extra)
