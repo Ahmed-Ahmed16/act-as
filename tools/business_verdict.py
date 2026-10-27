@@ -37,7 +37,8 @@ def verdict(options):
     pending = [area for area in areas if area['state'] != 'pass']
     pending.sort(key=lambda area: area['state'] != 'fail')
     if not pending:
-        print(f'business: pass, {len(areas)} areas, every rule kept')
+        print('business: pass, ' + '; '.join(
+            f'area {area["area"]}: every rule kept' for area in areas))
     else:
         state = 'fail' if pending[0]['state'] == 'fail' else 'incomplete'
         print(f'business: {state}, ' + '; '.join(

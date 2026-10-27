@@ -221,6 +221,28 @@ class SizeCounterTests(unittest.TestCase):
                 self.assertEqual(run.stdout, '')
                 self.assertEqual(len(run.stderr.splitlines()), 1, run.stderr)
 
+    def test_g12_git_diff_settings_keep_exact_hunks(self):
+        self.write('orchard.py', ''.join(f'fruit {n}\n' for n in range(12)))
+        self.base = self.commit()
+        self.write('orchard.py', 'pear\n' + ''.join(f'fruit {n}\n' for n in range(1, 11))
+                   + 'plum\n')
+        head = self.commit()
+        # Cases: defaults, each setting alone, both together, external diff.
+        for settings in [[], [('color.ui', 'always')], [('diff.interHunkContext', '10')],
+                         [('color.ui', 'always'), ('diff.interHunkContext', '10')],
+                         [('diff.external', 'missing-size-counter-diff')]]:
+            with self.subTest(settings=settings):
+                self.env['GIT_CONFIG_COUNT'] = str(len(settings))
+                for index, (key, value) in enumerate(settings):
+                    self.env[f'GIT_CONFIG_KEY_{index}'] = key
+                    self.env[f'GIT_CONFIG_VALUE_{index}'] = value
+                folder = self.root / 'packet'
+                report = self.count(head, '--out', folder)
+                self.assertEqual(report['counted_total'], 4)
+                self.assertEqual(self.file_rows(folder)[0]['hunks'], [
+                    {'id': 'f1h1', 'counted_lines': 2},
+                    {'id': 'f1h2', 'counted_lines': 2}])
+
     def test_size_packet_with_counter_files_passes_packet_check(self):
         self.write('orchard.py', 'fruit\nfruit\n')
         head = self.commit()
