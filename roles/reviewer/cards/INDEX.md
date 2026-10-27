@@ -262,7 +262,7 @@ to size and the packet, and question 30 to security.
 
 ## Translation check cards
 
-Drafted 2026-10-27 by claude-sonnet-5-5 (ticket 49). All are draft: not checked by a second model, not approved. Check ids stay on `gap` in the check map below until they are approved. Check id: T1 to T8 are the translation checks; G4 is the spec's user visible text pointer; "facts" are the English text as key facts; "layout" is the layout pointer.
+Drafted 2026-10-27 by claude-sonnet-5-5 (ticket 49), checked and rechecked by claude-opus-5-5, approved by Ahmed 2026-10-27 (spec B19). T1 to T8 map to REV-601 to REV-608 in the check map below. Check id: T1 to T8 are the translation checks; G4 is the spec's user visible text pointer; "facts" are the English text as key facts; "layout" is the layout pointer.
 
 | id | mode | trigger | status | check id | rule in short |
 | --- | --- | --- | --- | --- | --- |
@@ -353,25 +353,17 @@ Policy cards cover role rules. A check mapped to `gap` still needs a check card.
 | `H9` | `REV-418` |
 | `H10` | `REV-422` |
 | `H11` | `REV-425` |
-| `T1` | `gap` |
-| `T2` | `gap` |
-| `T3` | `gap` |
-| `T4` | `gap` |
-| `T5` | `gap` |
-| `T6` | `gap` |
-| `T7` | `gap` |
-| `T8` | `gap` |
+| `T1` | `REV-601` |
+| `T2` | `REV-602` |
+| `T3` | `REV-603` |
+| `T4` | `REV-604` |
+| `T5` | `REV-605` |
+| `T6` | `REV-606` |
+| `T7` | `REV-607` |
+| `T8` | `REV-608` |
 
 ## Card gap list
 
 - Q14
 - Q19
 - Q24
-- T1
-- T2
-- T3
-- T4
-- T5
-- T6
-- T7
-- T8

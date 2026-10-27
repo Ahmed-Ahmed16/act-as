@@ -244,6 +244,9 @@ Before each step, run `cards.py reviewer health <step number>`, for example
     values first, then `by_page`: each page, then "shared", then "no use
     found"). Findings go to Known risks, pointers to Pointers. A key passed
     through a variable is "not checked". Check record ids: T1 to T8, G4.
+    Translation check cards: `REV-601` to `REV-608`.
+    English key fact cards: `REV-609` to `REV-611`.
+    Layout and helper cards: `REV-612`, `REV-613`.
 17. **Pointers.** Every number from a tool or a guard is a pointer, including
     the 20 lines and complexity 10 of `clean-code-guard`. Each pointer gets 1
     line of judgement and a review question number. Example: "72 line method:
