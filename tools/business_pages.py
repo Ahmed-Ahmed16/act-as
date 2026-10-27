@@ -95,8 +95,35 @@ def mapped_files(files, pages):
             for row in files]
 
 
+def save_pages(out, pages):
+    # Boundaries: first run, empty update, existing areas, malformed saved entries.
+    manifest_path = out / 'rules-pages.json'
+    manifest = (json.loads(manifest_path.read_text(encoding='utf-8'))
+                if manifest_path.exists() else {'areas': []})
+    if not isinstance(manifest, dict) or not isinstance(manifest.get('areas'), list):
+        raise ValueError('saved rules pages must be an object with an areas list')
+    by_area = {}
+    for page in manifest['areas']:
+        if not isinstance(page, dict) or not isinstance(page.get('area'), str) or not page['area']:
+            raise ValueError('saved rules page must have an area name')
+        if page['area'] in by_area:
+            raise ValueError('duplicate saved rules page area: ' + page['area'])
+        by_area[page['area']] = page
+    for page, _ in pages:
+        by_area[page['area']] = {key: page[key] for key in ('area', 'page', 'commit', 'rules')}
+    manifest['areas'] = list(by_area.values())
+    manifest_path.write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf-8')
+    for page, contents in pages:
+        (out / 'runs' / f'rules-page-{page["area"]}.md').write_bytes(contents)
+
+
 def write_packet(options, commit, files, pages):
     touched = mapped_pages(files, pages)
+    selected = touched
+    if options.area is not None:
+        if set(options.area) - {page['area'] for page, _ in touched}:
+            raise ValueError('requested area is not touched by this diff')
+        selected = [(page, contents) for page, contents in touched if page['area'] in options.area]
     files = mapped_files(files, touched)
     unmapped = [dict(path=row['path'], old_path=row['old_path']) for row in files if not row['areas']]
     report = dict(base=options.base, head=options.head, default_ref=options.default_ref,
@@ -106,11 +133,7 @@ def write_packet(options, commit, files, pages):
     runs = options.out / 'runs'
     runs.mkdir(parents=True, exist_ok=True)
     (runs / 'business-map.json').write_text(json.dumps(report, indent=2) + '\n', encoding='utf-8')
-    manifest = {'areas': [{key: page[key] for key in ('area', 'page', 'commit', 'rules')}
-                          for page, _ in touched]}
-    (options.out / 'rules-pages.json').write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf-8')
-    for page, contents in touched:
-        (runs / f'rules-page-{page["area"]}.md').write_bytes(contents)
+    save_pages(options.out, selected)
     print(f'business_pages: {len(touched)} touched areas, {len(unmapped)} files with no area found')
 
 
@@ -119,6 +142,7 @@ def main(args):
     for flag in ('repo', 'base', 'head', 'default-ref', 'out'):
         parser.add_argument('--' + flag, required=True, type=Path if flag in ('repo', 'out') else str)
     parser.add_argument('--drafts', type=Path)
+    parser.add_argument('--area', action='append', help='update only this area; may be repeated')
     options = parser.parse_args(args)
     if any(not ref or ref.startswith('-') for ref in (options.base, options.head, options.default_ref)):
         parser.error('base, head and default-ref must be git revisions')
