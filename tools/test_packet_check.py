@@ -1,4 +1,5 @@
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -152,6 +153,35 @@ class PacketCheckTests(unittest.TestCase):
     def test_single_size_over_cap_not_asked_passes(self):
         packet = replace_line(single_packet('size'), 'size', 'fail, 120 counted lines')
         self.assert_pass(replace_body(packet, 'Split plan', 'not asked: size run only'))
+
+    def test_g14_size_mode_saved_examples_pass_packet_check(self):
+        mode = Path(__file__).resolve().parents[1] / 'roles/reviewer/modes/size.md'
+        instructions = mode.read_text(encoding='utf-8')
+        common, over_cap = instructions.split('**Over the cap (', 1)
+        pattern = r'`([\w-]+\.json)`(?:\s*:|\s+stays)\s*`([^`]+)`'
+        examples = dict(re.findall(pattern, common))
+        # G14: execute the saved examples at both sides of the cap.
+        for total, verdict in [(301, 'fail'), (300, 'pass')]:
+            with self.subTest(total=total):
+                saved = dict(examples)
+                if verdict == 'fail':
+                    overrides = dict(re.findall(pattern, over_cap))
+                    saved['split-plan.json'] = overrides.get('split-plan.json', '[]')
+                # The old instruction says empty lists when no object is shown.
+                for filename in ['check-record.json', 'split-plan.json', 'rules-pages.json']:
+                    self.inputs[filename] = json.loads(saved.get(filename, '[]'))
+                file = self.inputs['files.json']['files'][0]
+                file.update(counted_lines=total, hunks=[{'id': 'h1', 'counted_lines': total}])
+                self.write_inputs()
+                packet = replace_line(single_packet('size'), 'size',
+                                      f'{verdict}, {total} counted lines, cap 300')
+                packet = replace_body(packet, 'Tests run', 'not asked: size run only')
+                plan = ('not asked: size run only' if verdict == 'fail'
+                        else f'not needed: {total} counted lines, cap 300')
+                packet = replace_body(packet, 'Split plan', plan)
+                if verdict == 'fail':
+                    packet = replace_body(packet, 'Drafts, not sent', 'not asked: size run only')
+                self.assert_pass(packet)
 
     def test_single_size_over_cap_not_checked_passes(self):
         packet = replace_line(single_packet('size'), 'size', 'fail, 120 counted lines')
