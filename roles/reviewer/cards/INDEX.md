@@ -240,11 +240,11 @@ to size and the packet, and question 30 to security.
 | REV-502 | health, full | When answering review question 2 | approved | Q2 | Prefer the smallest change; ask if deleting or reusing gives the same result. |
 | REV-503 | health, full | When answering review question 3 | approved | Q3 | Imagine a helper or wrapper deleted; if nothing moves to the callers it hides nothing. |
 | REV-504 | health, full | When answering review question 4 | approved | Q4 | Solve the problem known now, not one that might come. |
-| REV-505 | health, full | When question 5 is asked after a pointer | approved | Q5 | A new one off special case in an existing flow is a design problem. |
+| REV-505 | health, full | When question 5 is asked | approved | Q5 | A new one off special case in an existing flow is a design problem. |
 | REV-506 | health, full | When question 6 is asked after a pointer | approved | Q6 | Splitting into small methods can go too far. |
 | REV-507 | health, full | When answering review question 7 | approved | Q7 | A name says in full what the thing is or does, and is not too long. |
 | REV-508 | health, full | When answering review question 8 | approved | Q8 | If you cannot follow the code, ask the author to clarify it first. |
-| REV-509 | health, full | When question 9 is asked after a pointer | approved | Q9 | A comment explains why, not what. |
+| REV-509 | health, full | When question 9 is asked | approved | Q9 | A comment explains why, not what. |
 | REV-510 | health, full | When answering review question 10 | approved | Q10 | Count layers and hidden state; judge in the context of the whole system. |
 | REV-511 | health, full | When answering review question 11 | approved | Q11 | Things that change together sit together; carries the G1 line. |
 | REV-512 | health, full | When answering review question 12 | approved | Q12 | A class answers to one narrow business function. NOT in the default set. |
@@ -254,7 +254,7 @@ to size and the packet, and question 30 to security.
 | REV-516 | health, full | When answering review question 17 | approved | Q17 | Lines added to a long method may mean a second job. |
 | REV-517 | health, full | When answering review question 18 | approved | Q18 | No second copy of existing logic; carries the G1 line. |
 | REV-518 | health, full | When answering review question 20 | approved | Q20 | Quick fix or design step: say which. User policy, no source. |
-| REV-519 | health, full | When question 21 is asked after a pointer | approved | Q21 | A refactoring goes in a separate PR from a feature or fix. |
+| REV-519 | health, full | When question 21 is asked | approved | Q21 | A refactoring goes in a separate PR from a feature or fix. |
 | REV-520 | health, full | When answering review question 22 | approved | Q22 | Follow the style of the code around it when no other rule applies. |
 | REV-521 | health, full | When answering review question 23 | approved | Q23 | Would the tests fail if the code broke? |
 | REV-522 | health, full | When the PR is a refactor or cleanup, for review question 31 | approved | Q31 | A refactor needs a record of old behaviour and proof it holds. |

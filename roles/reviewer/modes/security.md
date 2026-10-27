@@ -125,7 +125,7 @@ Before each step, run `cards.py reviewer security <step number>`, for example
    Access cards: `REV-301` to `REV-307`.
    Input and output cards: `REV-308` to `REV-319`.
    Secrets and login cards: `REV-320` to `REV-327`.
-   Settings and unsafe call cards: `REV-328` to `REV-342`.
+   Settings and unsafe call cards: `REV-328` to `REV-342`, `REV-356`, `REV-357`.
    Callback and dependency cards: `REV-343` to `REV-350`.
    Removed safeguard and request order cards: `REV-351` to `REV-354`.
 5. **Write each finding.** Words: `must fix`, `finding`, `lead`. No scale, no

@@ -4,13 +4,13 @@ Ask one thing: will this change hurt to change later? Health has 10 checks
 here (H1 to H10). Each check has a tool part and a reading part. A tool hit
 alone is never a finding. This mode runs no size, business or security check.
 
-Not written here yet, each in its own later step:
+Built, each in its own step:
 
 - The 8 translation checks and the user visible text pointer are built: `tools/translation_health.py` and `tools/translation_health_scan.py`, step 16.
 - `clean-code-guard`, `test-guard`, `docs-guard`, `debate-review`: see the block "Guard skills and debate-review (ticket 37)" below.
 
-Their steps are marked below. Until they exist, say each one is
-`not checked: <name> not built yet`. Health is then `incomplete`, never `pass`.
+Their steps are marked below. When one cannot run, write
+`not checked: <reason>`. Health is then `incomplete`, never `pass`.
 
 ## The 4 result words
 
@@ -357,8 +357,8 @@ The helper is `python tools/guard_run.py`. It decides; you read the result.
 - [ ] Every tool classified by `health_parse.py`; jscpd file count quoted.
 - [ ] Route counts and copy searches quoted with `path:line`.
 - [ ] Every pointer has a judgement line and a question number.
-- [ ] The 16 questions answered; the extra ones only where a pointer points.
-- [ ] Marked places for H11, the translation checks and the guard skills left as `not checked`.
+- [ ] The 16 questions answered; questions 5, 9 and 21 where the diff shows the thing; the other extra ones only where a pointer points.
+- [ ] H11, the translation checks and the guard skills each have a result; one that could not run says `not checked: <reason>`.
 - [ ] `health_verdict.py` output quoted and the health line matches it.
 - [ ] Packet check output quoted (`packet_check: pass`).
 - [ ] Start and end snapshot compared, result quoted.
