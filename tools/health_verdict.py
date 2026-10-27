@@ -53,7 +53,8 @@ def verdict(record):
         if 'not checked' in (entry['tool_result'], entry['reading_result']):
             unchecked = True
             reasons.append(f'{name}: not checked')
-    missing = [name for name in dict.fromkeys([f'H{n}' for n in range(1, 11)] + required)
+    missing = [name for name in dict.fromkeys([f'H{n}' for n in range(1, 12)] +
+                                             [f'T{n}' for n in range(1, 9)] + required)
                if name not in seen]
     decision = 'fail' if failed else 'incomplete' if unchecked or missing else 'pass'
     return outcome({'pass': 'clean', 'fail': 'finding', 'incomplete': 'not checked'}[decision],

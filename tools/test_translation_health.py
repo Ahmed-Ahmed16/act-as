@@ -55,6 +55,30 @@ class TranslationHealthTests(unittest.TestCase):
         shutil.copytree(self.root / 'lang', path)
         return path
 
+    def test_default_lang_path_finds_both_layouts(self):
+        # G36: lang only, resources/lang only; changed paths use the chosen folder.
+        del self.orders['ar']['title']
+        self.save_orders()
+        for folder in ('lang', 'resources/lang'):
+            with self.subTest(folder=folder):
+                if folder != 'lang':
+                    shutil.move(str(self.root / 'lang'), str(self.root / folder))
+                changed = self.changed([f'{folder}/en/orders.php'])
+                report = self.report('--changed-files', changed)
+                self.assertEqual(report['check1'], [
+                    dict(key='orders.title', shape='php', file='orders.php', locales_with=['en'],
+                         locales_missing=['ar'], touched_by_pr='yes', page='app/Parcel.php')])
+                self.assertFalse(report['no_translation_files_changed'])
+
+    def test_default_lang_path_prefers_lang_and_explicit_path_wins(self):
+        fallback = self.root / 'resources/lang'
+        self.write('resources/lang/en.json', '{"Fallback": "Fallback"}')
+        self.assertEqual(self.report()['check2'], [])
+        report = self.report('--lang', fallback)
+        self.assertEqual(report['check2'], [
+            dict(key='Save', locales_missing=['en'], used_at=['resources/views/cart.blade.php:1']),
+            dict(key='orders.title', locales_missing=['en'], used_at=['app/Parcel.php:1'])])
+
     def test_gaps_preserve_report_fields_and_add_page(self):
         self.assertEqual(self.report()['check1'], [])
         del self.orders['ar']['title']
@@ -122,6 +146,11 @@ class TranslationHealthTests(unittest.TestCase):
                  ("{!! __('Save', ['n' => htmlspecialchars($x), 'm' => e($y)]) !!}", True, 'Save'),
                  ("{!! __('Save', ['n' => $x]) !!}", False, 'Save'),
                  ("{!! trans_choice('Save', $n, ['n' => $x]) !!}", False, 'Save'),
+                 ("{!! Lang::get('Save', ['n' => $x]) !!}", False, 'Save'),
+                 ("{!! Lang::get('Save', ['n' => e($x)]) !!}", True, 'Save'),
+                 ("{!! Lang::choice('Save', $n) !!}", True, 'Save'),
+                 ("{!! Lang::choice('Save', $n, ['n' => $x]) !!}", False, 'Save'),
+                 ("{!! Lang::choice('Save', $n, ['n' => e($x)]) !!}", True, 'Save'),
                  ("{!! trans($key) !!}", True, None),
                  ("{!! @lang('Save') !!}", True, 'Save'),
                  ("{!! __('Save') !!}", True, 'Save')]
@@ -130,8 +159,10 @@ class TranslationHealthTests(unittest.TestCase):
                 self.write('resources/views/cart.blade.php', source)
                 self.assertEqual(self.report()['check7'], [dict(path='resources/views/cart.blade.php',
                                                               line=1, key=key, args_escaped=escaped)])
-        self.write('resources/views/cart.blade.php', "{{ __('Save') }}")
-        self.assertEqual(self.report()['check7'], [])
+        for call in ("__('Save')", "Lang::get('Save')", "Lang::choice('Save', $n)"):
+            with self.subTest(escaped_output=call):
+                self.write('resources/views/cart.blade.php', '{{ ' + call + ' }}')
+                self.assertEqual(self.report()['check7'], [])
 
     def test_letter_checks_reuse_report_and_list_unknown_locale(self):
         self.assertEqual(self.report()['check8'], dict(no_letters=[], locales_not_checked_for_letters=[]))

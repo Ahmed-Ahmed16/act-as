@@ -194,7 +194,7 @@ Before each step, run `cards.py reviewer health <step number>`, for example
     The command, the fault and the result stay in `independent-check.json`,
     apart from the CI evidence; Known risks names that file.
 16. **Translation checks (T1 to T8, G4).** Run
-    `python tools/translation_health.py --repo <copy of head> --base-lang <lang folder at the comparison base> --changed-files <files.json>`
+    `python tools/translation_health.py --repo <copy of head> --lang <head lang folder: lang or resources/lang> --base-lang <lang folder at the comparison base> --changed-files <files.json>`
     and save its output in `runs/`. It reads files only. No changed language
     file: write "no translation files changed" and stop. Every item below
     is a finding or a pointer. None is ever `must fix`, and none fails health,
