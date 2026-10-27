@@ -28,7 +28,9 @@ Before each step, run `cards.py reviewer security <step number>`, for example
    It runs 3 tools in the 1 reviewer image (its name is in the output; write
    it in the packet): Semgrep on the added and changed files only, never the
    whole project; `composer audit` on the head lock file; gitleaks on the head
-   files. Container rules, all of them:
+   files. The scan folder holds the exact Git blobs. Export attributes cannot
+   omit or rewrite them. Composer advisories are counted from its JSON output.
+   Container rules, all of them:
    - Every container is named `actas-t33-<tool>-<pid>` and run with `--rm`.
    - The head files are mounted read only. Never mount the checkout, the home
      folder or the Docker socket.
@@ -45,9 +47,12 @@ Before each step, run `cards.py reviewer security <step number>`, for example
    `not checked: <tool> did not run, <reason>` (tool is `semgrep`,
    `composer audit` or `gitleaks`). Never a pass. The reading part of every
    check still runs, and a reading finding stays a finding. A Semgrep
-   check that did not run, or that scanned a different path list than
-   `files.json`, is "not checked", not clean. Copy the tool's output into
-   `runs/`.
+   check that did not run, or that missed a PHP file from `files.json`, is
+   "not checked", not clean. The PHP rules cover `.php`, `.phtml` and `.tpl`.
+   `semgrep-paths.txt` holds the paths from Semgrep's JSON `paths.scanned`.
+   If that field is missing, the line is
+   `not checked: semgrep did not report scanned paths`. Copy the tool's output
+   into `runs/`.
 3. **Find the spots.** Command:
    `python tools/security_scan.py finders --repo <checkout> --base <comparison base> --head <PR head> --out <packet folder>/runs`
    It writes `runs/security-finders.json`: search hits for each check, on
@@ -215,8 +220,8 @@ Default rules (O10, not yet confirmed): the same as "rerun business".
 - [ ] Head, base branch head and comparison base written down in full.
 - [ ] The image name, and the output line of each of the 3 tools (or its
       exact "not checked" line).
-- [ ] The Semgrep path list equals the changed files in `files.json` (the
-      `pathcheck` line).
+- [ ] The paths Semgrep reports match the changed PHP files in `files.json`
+      (the `pathcheck` line).
 - [ ] Finders file saved. No secret in any saved file.
 - [ ] 24 entries in `check-record.json`: S1 to S22, L1, L5.
 - [ ] Every finding has an abuse line and a harm line. Every `must fix` has a
