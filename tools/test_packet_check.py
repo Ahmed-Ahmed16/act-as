@@ -200,6 +200,16 @@ class PacketCheckTests(unittest.TestCase):
         self.write_inputs()
         self.assert_pass(replace_body(good_packet(), 'Split plan', 'Separate cart and account changes.'))
 
+    def test_split_plan_not_needed_requires_a_reason_g6(self):
+        # Boundaries: empty, spaces, tabs, newlines, and a real reason.
+        for body in ['not needed:', 'not needed:   ', 'not needed:\t',
+                     'not needed:\n \t']:
+            with self.subTest(body=body):
+                self.assert_rule(replace_body(good_packet(), 'Split plan', body),
+                                 'missing-part', 'missing content: Split plan')
+        self.assert_pass(replace_body(good_packet(), 'Split plan',
+                                     'not needed: The change fits together.'))
+
     def test_not_checked_empty_reports_only_its_own_rule(self):
         for body in ['', ' \n\t']:
             with self.subTest(body=body):
@@ -225,6 +235,18 @@ class PacketCheckTests(unittest.TestCase):
         self.assert_rule(packet, 'unknown-unmatched', 'unmatched unknowns: fee')
         self.assert_pass(replace_body(packet, 'Not checked',
                                      '___ (tax): Missing rule.\n___ (fee): Missing owner.'))
+
+    def test_unknown_placeholder_reasons_are_unmatched_g7(self):
+        # Boundaries: empty answers, case, padding, and bare or labelled markers.
+        for reason, labels in [('unknown', 'tax'), ('not checked', 'tax'),
+                               ('not checked:', 'tax'), ('none', 'tax'),
+                               (' UNKNOWN \t', 'tax'), ('___', 'bare ___, tax'),
+                               ('___ (reason)', 'tax')]:
+            with self.subTest(reason=reason):
+                packet = replace_body(good_packet(), 'Not checked', '___ (tax): ' + reason)
+                self.assert_rule(packet, 'unknown-unmatched', 'unmatched unknowns: ' + labels)
+        self.assert_pass(replace_body(good_packet(), 'Not checked',
+                                     '___ (tax): The owner has not supplied the tax rule.'))
 
     def test_safe_to_merge_rejects_substrings_and_case(self):
         for phrase in ['safe to merge', 'SAFE TO MERGE', 'unsafe to merge']:

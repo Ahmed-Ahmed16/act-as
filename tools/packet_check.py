@@ -237,13 +237,15 @@ def missing_parts(bodies):
             continue
         only_placeholders = all(line.strip().lower() in {'none', *NO_REASON}
                                 for line in body.splitlines() if line.strip())
-        if not body or (heading not in HEADINGS[4:6] and only_placeholders):
+        empty_split_reason = (heading == 'Split plan' and body.startswith('not needed:')
+                              and not body[len('not needed:'):].strip())
+        if not body or empty_split_reason or (heading not in HEADINGS[4:6] and only_placeholders):
             missing.append(heading)
     return missing
 
 
 def unmatched_unknowns(lines):
-    # Cases: bare, labelled, repeated, matching label, absent or blank reason.
+    # Cases: bare, labelled, repeated, matching label, absent, blank or placeholder reason.
     explained = set()
     outside = []
     bare = False
@@ -257,8 +259,12 @@ def unmatched_unknowns(lines):
                 bare = True
             elif heading != 'Not checked':
                 outside.append(labelled[1])
-            elif re.match(r'[ \t]*:[ \t]*\S', line[labelled.end():]):
-                explained.add(labelled[1])
+            else:
+                explanation = re.match(r'[ \t]*:[ \t]*(\S.*)', line[labelled.end():])
+                if explanation:
+                    reason = explanation[1].strip()
+                    if reason.lower() not in {'none', *NO_REASON} and not UNKNOWN.fullmatch(reason):
+                        explained.add(labelled[1])
     return (['bare ___'] if bare else []) + list(dict.fromkeys(
         label for label in outside if label not in explained))
 
