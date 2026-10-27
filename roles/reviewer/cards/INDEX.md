@@ -266,19 +266,19 @@ Drafted 2026-10-27 by claude-sonnet-5-5 (ticket 49). All are draft: not checked 
 
 | id | mode | trigger | status | check id | rule in short |
 | --- | --- | --- | --- | --- | --- |
-| REV-601 | health, full | When running translation check T1 (a key in 1 language but not another) | draft | T1 | A key in 1 language only is a finding of check 1, never must fix, touched_by_pr as data. |
-| REV-602 | health, full | When running translation check T2 (a key used in code but missing from a language file) | draft | T2 | A used key missing from a language file is a finding of check 2, never must fix. |
-| REV-603 | health, full | When running translation check T3 (a named placeholder missing in 1 language) | draft | T3 | A named placeholder missing in 1 language is a finding of check 3, skip :count. |
-| REV-604 | health, full | When running translation check T4 (the wrong number of plural forms) | draft | T4 | A wrong count of plural forms for a trans_choice key is a finding of check 4: en 2, ar 6. |
-| REV-605 | health, full | When running translation check T5 (changed old values) | draft | T5 | List changed old values apart and first. A pointer. |
-| REV-606 | health, full | When running translation check T6 (keys with no use found) | draft | T6 | A key with no use found is a pointer, in 2 groups: through a variable, no trace. |
-| REV-607 | health, full | When running translation check T7 (raw output of a translation) | draft | T7 | Check that each value inserted into a raw translation output is escaped. A pointer. |
-| REV-608 | health, full | When running translation check T8 (a value with no letters of its language) | draft | T8 | A value with no letters of its language is a pointer. |
-| REV-609 | health, full | When reporting a missing key in a project that uses English text as keys | draft | facts | A missing key shows the English text with no error. |
-| REV-610 | health, full | When a PR edits an English text used as a translation key | draft | facts | Editing English key text makes a new key and loses the Arabic, silently. |
-| REV-611 | health, full | When a PR adds a JSON key that equals a translation file name | draft | facts | Point out a text key that clashes with a translation file name. |
-| REV-612 | health, full | When a PR adds many keys to 1 language file | draft | layout | Suggest a common file plus 1 file per page, as a pointer only. |
-| REV-613 | health, full | When reading changed PHP and Blade for user visible text typed as a literal (G4) | draft | G4 | User visible text should go through the translation helper. A pointer. |
+| REV-601 | health, full | When running translation check T1 (a key in 1 language but not another) | approved | T1 | A key in 1 language only is a finding of check 1, never must fix, touched_by_pr as data. |
+| REV-602 | health, full | When running translation check T2 (a key used in code but missing from a language file) | approved | T2 | A used key missing from a language file is a finding of check 2, never must fix. |
+| REV-603 | health, full | When running translation check T3 (a named placeholder missing in 1 language) | approved | T3 | A named placeholder missing in 1 language is a finding of check 3, skip :count. |
+| REV-604 | health, full | When running translation check T4 (the wrong number of plural forms) | approved | T4 | A wrong count of plural forms for a trans_choice key is a finding of check 4: en 2, ar 6. |
+| REV-605 | health, full | When running translation check T5 (changed old values) | approved | T5 | List changed old values apart and first. A pointer. |
+| REV-606 | health, full | When running translation check T6 (keys with no use found) | approved | T6 | A key with no use found is a pointer, in 2 groups: through a variable, no trace. |
+| REV-607 | health, full | When running translation check T7 (raw output of a translation) | approved | T7 | Check that each value inserted into a raw translation output is escaped. A pointer. |
+| REV-608 | health, full | When running translation check T8 (a value with no letters of its language) | approved | T8 | A value with no letters of its language is a pointer. |
+| REV-609 | health, full | When reporting a missing key in a project that uses English text as keys | approved | facts | A missing key shows the English text with no error. |
+| REV-610 | health, full | When a PR edits an English text used as a translation key | approved | facts | Editing English key text makes a new key and loses the Arabic, silently. |
+| REV-611 | health, full | When a PR adds a JSON key that equals a translation file name | approved | facts | Point out a text key that clashes with a translation file name. |
+| REV-612 | health, full | When a PR adds many keys to 1 language file | approved | layout | Suggest a common file plus 1 file per page, as a pointer only. |
+| REV-613 | health, full | When reading changed PHP and Blade for user visible text typed as a literal (G4) | approved | G4 | User visible text should go through the translation helper. A pointer. |
 
 ## Check map
 
