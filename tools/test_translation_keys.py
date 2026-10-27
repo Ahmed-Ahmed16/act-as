@@ -388,6 +388,31 @@ class TranslationKeyTests(unittest.TestCase):
         self.assertEqual(php_keys(source), {'outer.luma', 'escaped', 'joined', 'called', 'number'})
         self.assertEqual(file_keys(self.lang / 'ava/sector/niva.php', 'php'), php_keys(source))
 
+    def test_php_interpolated_values_have_no_text(self):
+        from translation_keys import php_values
+        cases = [(r'"$message"', None), (r'"{$x}"', None),
+                 (r'"${message}"', None), (r'"Hi $message :name"', None),
+                 (r'"\\$message"', None), (r'"\$message"', '$message'),
+                 (r'"\\\$message"', r'\$message'), (r'"\$5 off"', '$5 off'),
+                 (r'"$5 off"', '$5 off'), ("'$message'", '$message')]
+        for token, expected in cases:
+            with self.subTest(token=token):
+                self.assertEqual(php_values("<?php return ['luma' => " + token + "];")['luma'], expected)
+
+    def test_php_interpolation_skips_value_warnings_but_keeps_literal_checks(self):
+        for token in [r'"$message"', r'"{$x}"', r'"${message}"', r'"\\$message"']:
+            with self.subTest(token=token):
+                self.write('ar/niva.php', "<?php return ['luma' => " + token +
+                           r''', 'price' => "\$5 off"];''')
+                self.write('en/niva.php', "<?php return ['luma' => 'Hi :name', 'price' => 'Discount'];")
+                report = self.entries('--report', 'values')
+                self.assertEqual(report['no_letters'], [
+                    dict(key='niva.price', shape='php', file='niva.php', locale='ar')])
+                self.assertEqual(report['placeholder_gaps'], [])
+                self.assertEqual([(entry['key'], entry['locale']) for entry in report['values']],
+                                 [('niva.luma', 'en'), ('niva.price', 'ar'), ('niva.price', 'en')])
+                self.assertEqual(report['gaps'], [])
+
     def test_unreadable_base_and_head_files_skip_value_checks(self):
         self.write('ava.json', '{"luma": "Hi :name", "number": 3}')
         self.write('bex.json', '{')
