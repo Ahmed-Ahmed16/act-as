@@ -59,7 +59,16 @@ def redact_strings(document):
     if isinstance(document, list):
         return [redact_strings(entry) for entry in document]
     if isinstance(document, dict):
-        return {key: redact_strings(entry) for key, entry in document.items()}
+        redacted = {}
+        for key, entry in document.items():
+            base_key = redact(key) if isinstance(key, str) else key
+            masked_key = base_key
+            suffix = 2
+            while masked_key in redacted or (masked_key != key and masked_key in document):
+                masked_key = f'{base_key}#{suffix}'
+                suffix += 1
+            redacted[masked_key] = redact_strings(entry)
+        return redacted
     return document
 
 
