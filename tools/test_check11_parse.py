@@ -4,6 +4,54 @@ from check11_parse import parse
 
 
 class ParseTests(unittest.TestCase):
+    # Cases: issues with counts, missing counts, 0 counts, failures, errors, bad exit.
+    def test_phpunit_issues_summary_requires_a_green_run(self):
+        cases = [
+            ('Tests: 4, Assertions: 8, PHPUnit Deprecations: 1.', 0, 'ok', 4, 8),
+            ('Tests: 1, Assertions: 1, Warnings: 1.', 0, 'ok', 1, 1),
+            ('', 0, 'none', 0, 0),
+            ('Tests: 0, Assertions: 0.', 0, 'none', 0, 0),
+            ('Tests: 1, Assertions: 0.', 0, 'none', 1, 0),
+            ('Tests: 4, Assertions: 8, Failures: 1.', 0, 'none', 4, 8),
+            ('Tests: 4, Assertions: 8, Failures: 0.', 0, 'none', 4, 8),
+            ('Tests: 4, Assertions: 8, Errors: 1.', 0, 'error', 4, 8),
+            ('Tests: 4, Assertions: 8, Errors: 0.', 0, 'none', 4, 8),
+            ('Tests: 4, Assertions: 8.', 1, 'none', 4, 8),
+        ]
+        for summary, code, state, tests, assertions in cases:
+            with self.subTest(summary=summary, code=code):
+                text = 'PHPUnit 11.0\nOK, but there were issues!\n' + summary
+                self.assertEqual(parse(text, code), dict(
+                    state=state, tests=tests, assertions=assertions, message=''))
+
+    # Cases: passed, mixed, failed assertion, exception, 0 passed, ANSI, bad exit.
+    def test_collision_summaries_and_failure_messages(self):
+        assertion = 'Failed asserting that true is false.'
+        cases = [
+            ('1 passed (1 assertions)', '', 0, 'ok', 1, 1, ''),
+            ('2 passed (5 assertions)', '', 0, 'ok', 2, 5, ''),
+            ('1 failed (1 assertions)', assertion, 1, 'assertion', 1, 1, assertion),
+            ('1 failed, 2 passed (5 assertions)', assertion, 1, 'assertion', 3, 5, assertion),
+            ('1 failed (0 assertions)', 'RuntimeException: shop is closed', 1, 'error', 1, 0, ''),
+            ('0 passed (0 assertions)', '', 0, 'none', 0, 0, ''),
+            ('1 passed (0 assertions)', '', 0, 'none', 1, 0, ''),
+            ('1 passed (1 assertions)', '', 1, 'none', 1, 1, ''),
+            ('1 failed, 2 passed (5 assertions)', assertion, 0, 'assertion', 3, 5, assertion),
+        ]
+        for summary, failure, code, state, tests, assertions, message in cases:
+            for colour in (False, True):
+                with self.subTest(summary=summary, failure=failure, code=code, colour=colour):
+                    label = 'FAIL' if failure else 'PASS'
+                    mark = '\u2a2f' if failure else '\u2713'
+                    text = (f'   {label}  Tests\\Feature\\ShopTest\n'
+                            f'  {mark} a basket can be emptied   0.12s\n'
+                            f'    {failure}\n    at tests/Feature/ShopTest.php:12\n'
+                            f'  Tests:    {summary}\n  Duration: 0.30s\n')
+                    if colour:
+                        text = '\x1b[32m' + text.replace('Tests:', '\x1b[0mTests:\x1b[32m') + '\x1b[0m'
+                    self.assertEqual(parse(text, code), dict(
+                        state=state, tests=tests, assertions=assertions, message=message))
+
     # Boundaries: missing summary, 0/1 counts, skips, errors, and missing runner.
     def test_phpunit_states_and_counts(self):
         cases = [

@@ -169,6 +169,8 @@ Before each step, run `cards.py reviewer health <step number>`, for example
     apply: no test in a risky area`. This never hides check H6 (risky area with
     no test). Write the picks and the code line to break in a spec file, then
     run `python tools/check11_run.py --repo <checkout> --head <head commit> --spec <spec.json> --out <packet folder>/independent-check --image actas-reviewer:2026-10-26 --record runs/check-record.json --reading-result <word>`.
+    Use plain PHPUnit for 1 test file in the spec command: `php vendor/bin/phpunit tests/Feature/ShopTest.php --filter {test}`, never a whole suite.
+    A probe that exits non zero gives `not checked: probe did not run`.
     The tool works only in a throwaway copy, with the network off. It never
     writes to the checkout (`REV-P01`, `REV-P03`); if the checkout changes, it
     stops. Per test, it does these in order: a green run first; proof that the

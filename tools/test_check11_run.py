@@ -31,6 +31,10 @@ if name == 'probe':
 if name == 'probe_exit':
     print('cart')
     sys.exit(int(source == 'FAULT'))
+if name in ('shop_crash', 'shop_crash_before', 'shop_crash_after'):
+    print('shop')
+    sys.exit(255 if (name == 'shop_crash' or
+                    source == ('GREEN' if name == 'shop_crash_before' else 'FAULT')) else 0)
 if name == 'probe_stderr':
     print('cart')
     print(source, file=sys.stderr)
@@ -202,10 +206,30 @@ class RunTests(unittest.TestCase):
         self.assertEqual(report['tests'][0]['reason'], 'fault did not contradict the assertion')
         self.assertIn('fake: fault did not contradict the assertion', summary['reason'])
 
-    def test_probe_exit_code_difference_also_proves_contradiction(self):
+    def test_probe_nonzero_exit_is_not_a_contradiction(self):
         self.spec['tests'] = [self.pick('fake', 'probe_exit')]
-        summary, _ = self.checked()
-        self.assertEqual(summary['result'], 'finding')
+        summary, report = self.checked()
+        self.assertEqual(summary['result'], 'not checked')
+        self.assertEqual(report['tests'][0]['reason'], 'probe did not run, exit code 1')
+
+    # Cases: both probes crash, only before crashes, only after crashes; green or red test.
+    def test_crashed_probe_is_not_checked_with_its_exit_code(self):
+        for probe in ('shop_crash', 'shop_crash_before', 'shop_crash_after'):
+            for name in ('fake', 'good'):
+                with self.subTest(probe=probe, name=name):
+                    self.spec['tests'] = [self.pick(name, probe)]
+                    summary, report = self.checked()
+                    self.assertEqual(summary['result'], 'not checked')
+                    checked = report['tests'][0]
+                    self.assertEqual(checked['tool_result'], 'not checked')
+                    self.assertEqual(checked['reason'], 'probe did not run, exit code 255')
+                    self.assertEqual(checked['word'], 'none')
+                    failed = next(s for s in checked['steps'] if s.get('exit_code') == 255)
+                    self.assertEqual(failed['stdout'].strip(), 'shop')
+                    if probe == 'shop_crash_after':
+                        self.assertTrue(checked['steps'][-2]['byte_equal'])
+                        self.assertEqual(checked['steps'][-1]['parsed']['state'], 'ok')
+                    self.assertEqual(self.source.read_bytes(), b'GREEN')
 
     def test_probe_stderr_difference_is_not_a_contradiction(self):
         self.spec['tests'] = [self.pick('fake', 'probe_stderr')]
