@@ -232,6 +232,16 @@ class ShortPacketTests(unittest.TestCase):
         self.save('split-plan.json', dict(plan, ci=dict(state='read', workflows=[dict(path='ci.yml', on_text=None)])))
         self.assert_bad_writer()
 
+    def test_ci_record_missing_reason_or_workflows_refuses(self):
+        self.prepare()
+        plan = self.read('split-plan.json')
+        for ci in [dict(state='unreadable'), dict(state='read')]:
+            with self.subTest(ci=ci):
+                self.save('split-plan.json', dict(plan, ci=ci))
+                run = self.writer()
+                self.assertEqual((run.returncode, run.stdout), (2, ''), run.stdout + run.stderr)
+                self.assertIn('plan has missing fields', run.stderr)
+
     def test_bad_rendered_shape_and_inconsistent_counts_leave_no_outputs(self):
         self.prepare()
         plan = self.read('split-plan.json')

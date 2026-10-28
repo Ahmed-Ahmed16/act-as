@@ -40,7 +40,8 @@ def load_inputs(folder):
     row = dict(name=str, summary=str, hunks=[str], counted=int, needs=[str], marks=[str], rebuild=str)
     for document, schema in [(plan, dict(groups=dict(row, entry_points=[str], pages={}, keys={}, links={}),
                                         first_group_parts=row, unplaced=[str])), (plan['main'], dict(state=str, evidence=str)),
-                             (plan['ci'], dict(state=str))]:
+                             (plan['ci'], dict(state=str, **({'reason': str} if plan['ci'].get('state') == 'unreadable'
+                                                             else {'workflows': {}})))]:
         if checks.input_fields(document, schema, 'plan'):
             raise ValueError('plan has missing fields')
     for name, field in [('files.json', 'files_sha256'), ('hunks.json', 'hunks_sha256'),
