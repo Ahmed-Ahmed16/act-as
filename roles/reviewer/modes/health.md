@@ -148,6 +148,7 @@ Before each step, run `cards.py reviewer health <step number>`, for example
     was already there and the PR only touched its file. It is `must fix` only
     with a shown burden (the PR made the 2nd copy) and a small fix named in
     1 line (for example "move the list to `config/uploads.php`"). No copy: `clean`.
+    An `incomplete` result is `not checked` because the search hit its cap.
 15. **H11 and the independent check.** Not written here. Ticket 36 fills this
     step. Until it does, write `H11: not checked: independent check not built yet`.
 16. **Translation checks.** Not written here. Ticket 38 fills this step. Until

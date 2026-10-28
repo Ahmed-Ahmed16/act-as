@@ -7,6 +7,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
 
 import health_search
 
@@ -88,8 +89,7 @@ class HealthSearchTests(unittest.TestCase):
                          (0, 0, []))
 
     def test_acme_new_lists_and_limits_name_both_paths_with_lines(self):
-        # N4 cases: 1 character, 2 digits, whitespace, longer fixed text.
-        for literal in ("['Acme', 'Card']", '5120', '64', '10', '1', ' '):
+        for literal in ("['Acme', 'Card']", '5120', 'foo'):
             with self.subTest(literal=literal):
                 self.write('app/Card.php', '\n' + literal + '\n')
                 self.write('config/shop.php', '')
@@ -108,6 +108,99 @@ class HealthSearchTests(unittest.TestCase):
                     dict(path='config/shop.php', line=1, at_base=False, in_config=True,
                          in_lang=False, in_test=False)])
                 self.git('checkout', 'main')
+
+    def test_copy_cap_never_classifies_partial_base_or_head_counts(self):
+        # Cases: base overflow, head overflow, both overflow, much larger output.
+        for base_count, head_count in ((3, 2), (2, 3), (3, 3), (1000, 1000)):
+            with self.subTest(base=base_count, head=head_count):
+                self.write('app/Card.php', 'foo\n' * base_count)
+                base = self.commit()
+                self.write('app/Card.php', 'foo\n' * head_count)
+                head = self.commit()
+                args = SimpleNamespace(repo=self.repo, base=base, head=head,
+                                       literal=['foo', 'absent'])
+                with patch.object(health_search, 'MAX_ROWS', 2):
+                    document = health_search.copies(args)
+                summary = document['summary'][0]
+                self.assertEqual(document['result'], 'not checked')
+                self.assertTrue(summary['incomplete'])
+                self.assertEqual(summary['result'], 'not checked')
+                self.assertIn('cap', summary['reason'])
+                self.assertIn('2', summary['reason'])
+                self.assertEqual(document['literals'][0]['copies'], [])
+                for key in ('copy_count', 'new_copies', 'old_copies', 'old_only'):
+                    self.assertNotIn(key, summary)
+                self.assertEqual(document['summary'][1]['result'], 'clean')
+                self.assertLess(len(json.dumps(document)), 1000)
+
+    def test_finding_on_1_literal_wins_over_a_capped_literal(self):
+        self.write('app/Card.php', 'foo\n' * 3 + 'rule\n')
+        base = self.commit()
+        self.write('config/shop.php', 'rule\n')
+        head = self.commit()
+        args = SimpleNamespace(repo=self.repo, base=base, head=head, literal=['foo', 'rule'])
+        with patch.object(health_search, 'MAX_ROWS', 2):
+            document = health_search.copies(args)
+        self.assertEqual(document['summary'][0]['result'], 'not checked')
+        self.assertEqual(document['summary'][1]['result'], 'finding')
+        self.assertEqual(document['result'], 'finding')
+
+    def test_up_to_cap_keeps_complete_counts_and_test_rows(self):
+        # Cases: below cap, exactly cap; test rows have their own space.
+        for count in (1, 2):
+            with self.subTest(count=count):
+                self.write('tests/Card.php', 'foo\n' * 2)
+                self.write('zapp/Card.php', 'foo\n' * count)
+                head = self.commit()
+                args = SimpleNamespace(repo=self.repo, base=head, head=head, literal=['foo'])
+                with patch.object(health_search, 'MAX_ROWS', 2):
+                    document = health_search.copies(args)
+                self.assertEqual(document['result'], 'clean')
+                self.assertEqual(document['summary'][0]['copy_count'], count)
+                self.assertEqual(document['summary'][0]['old_copies'], count + 2)
+                self.assertEqual(document['summary'][0]['new_copies'], 0)
+                self.assertEqual(len(document['literals'][0]['copies']), count + 2)
+
+    def test_grep_stops_reading_and_reaps_the_process_at_the_cap(self):
+        # The process boundary is mocked to catch reading beyond the overflow row.
+        for path in ('app/Card.php', 'tests/Card.php', 'app/Card\nName.php'):
+            with self.subTest(path=path):
+                def lines():
+                    for number in range(1, 4):
+                        yield from f'HEAD:{path}\0{number}\0foo\n'.encode('utf-8').splitlines(
+                            keepends=True)
+                    self.fail('grep output was read past the cap')
+
+                process = MagicMock()
+                process.__enter__.return_value = process
+                process.stdout = lines()
+                process.returncode = -9
+                process.poll.return_value = -9
+                with patch.object(health_search, 'MAX_ROWS', 2), patch.object(
+                        health_search.subprocess, 'Popen', return_value=process):
+                    rows, incomplete = health_search.occurrences(self.repo, 'HEAD', 'foo')
+                self.assertEqual(rows, [(path, 1), (path, 2)])
+                self.assertTrue(incomplete)
+                process.kill.assert_called_once_with()
+                process.wait.assert_called_once_with()
+
+    def test_grep_failure_keeps_the_existing_error_style(self):
+        self.write('app/Card.php', 'foo')
+        self.commit()
+        with self.assertRaisesRegex(ValueError, '^git failed:'):
+            health_search.occurrences(self.repo, 'missing-ref', 'foo')
+
+    def test_short_literals_use_the_existing_cli_error_shape(self):
+        self.write('app/Card.php', 'foo')
+        head = self.commit()
+        for literal in (' ', '$a', '64', '10', '1', '  ab  '):
+            with self.subTest(literal=literal):
+                run = self.run_cli('copies', '--repo', self.repo, '--base', head,
+                                   '--head', head, '--literal', literal)
+                self.assertEqual(run.returncode, 2)
+                self.assertEqual(run.stdout, '')
+                self.assertEqual(run.stderr.strip(),
+                                 'literal must be at least 3 characters after strip() and on 1 line')
 
     def test_acme_g18_existing_file_counts_only_extra_copies_as_new(self):
         # G18 cases: added copies, unchanged copies, fewer copies, no copies.
@@ -190,7 +283,7 @@ class HealthSearchTests(unittest.TestCase):
         for literal in ('', '64\n10', '64\r10', '64\0'):
             with self.subTest(literal=literal):
                 with self.assertRaises(ValueError):
-                    health_search.copies(SimpleNamespace(literal=['64', literal]))
+                    health_search.copies(SimpleNamespace(literal=['foo', literal]))
 
     def test_acme_bad_paths_refs_literals_and_arguments_have_1_error_line(self):
         self.write('app/Card.php', 'Acme')
