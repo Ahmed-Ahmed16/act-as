@@ -47,10 +47,18 @@ cover every changed line once. Operations such as f1op allow no range.
 Hunk placement checks skip not needed and size mode fail with not asked.
 
 Packet types add rules to these common checks. Full packets need size
-counts, Tests run tied to the head, a money form above, and not needed
-in Split plan. Security and health cannot say not checked in full packets.
+counts, Tests run tied to the head, and a money form above.
+Full packets need health entries H1 to H11 and T1 to T8 in health mode.
+They need exactly 1 Laravel line before the first heading.
+Use Laravel: project <version>, card docs <n>.x, with an optional suffix
+, from the constraint, not the lock. The project text cannot contain a comma.
+Behaviour changed needs Translations by page: <text> or exactly
+no translation files changed. Cap stop text is forbidden anywhere in full packets.
+Split plan says not needed unless the cap line requires real split groups.
+Full health findings with reason touches: need security entries F-<health id>.
+Security and health cannot say not checked in full packets.
 An override needs the exact cap line above the identity, size fail with
-counts, and no verdict saying not checked because of the cap.
+counts, and split groups in both the body and split-plan.json.
 Short packets have size fail with counts and the cap stop text in the
 other verdicts, money, and fields except Behaviour changed, Split plan,
 and Drafts, not sent. Behaviour changed needs ordered group summary lines and the exact cap stop Translations line.
@@ -64,11 +72,14 @@ the cap line unless mode is size.
 In size mode, fail needs Split plan exactly not asked: size run only.
 That case forbids group lines in Split plan and Drafts, not sent.
 In full and single mode packets, tests-ci-form requires each non blank
-Tests run line to say CI run <id> on <40 hex>: <pass|fail>. The id uses
+Tests run line to say CI run <id> on <40 hex>: <state>. States are pass,
+fail, pending, cancelled, mixed. The id uses
 letters A to Z or a to z, digits, underscores, or hyphens. Hex may use
 either case. The exact not checked: no CI run on head <sha> form is also
 allowed, as is not asked: <mode> run only in single mode packets.
 Missing content stays with missing-part. Short packets skip tests-ci-form.
+If runs/ci-runs.json exists, its saved heads disprove a no CI run claim.
+That file accepts a page object or an array of pages with workflow_runs.
 The existing full-tests-run and single-tests-run rules reject any 40 hex
 commit other than the head and require the no CI run form to name that head.
 The rerun-field rule requires identity rerun=yes exactly when a line
@@ -154,6 +165,30 @@ def read_inputs(folder):
     return inputs, missing
 
 
+def ci_run_heads(folder):
+    # Cases: absent file, empty pages, 1 page, many pages, and invalid shapes.
+    path = folder / 'runs/ci-runs.json'
+    if not path.exists():
+        return None
+    try:
+        pages = json.loads(path.read_text(encoding='utf-8'))
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        raise ValueError('runs/ci-runs.json is unreadable or invalid JSON') from error
+    if isinstance(pages, dict):
+        pages = [pages]
+    if not isinstance(pages, list):
+        raise ValueError('runs/ci-runs.json must hold pages')
+    heads = set()
+    for page in pages:
+        if not isinstance(page, dict) or not isinstance(page.get('workflow_runs'), list):
+            raise ValueError('runs/ci-runs.json page needs a workflow_runs list')
+        for run in page['workflow_runs']:
+            if not isinstance(run, dict) or not isinstance(run.get('head_sha'), str):
+                raise ValueError('runs/ci-runs.json run needs a head_sha string')
+            heads.add(run['head_sha'].lower())
+    return heads
+
+
 def record_failures(lines, inputs):
     record = inputs['check-record.json']
     entries = record['entries']
@@ -164,6 +199,13 @@ def record_failures(lines, inputs):
         # The 24 security checks: S1 to S22, plus L1 and L5.
         required += [f'S{number}' for number in range(1, 23)] + ['L1', 'L5']
     checks = [('check-record-id', 'missing ids', [key for key in required if key not in ids])]
+    if any(re.search(r'(?:^|;)\s*mode=full\s*(?:;|$)', identity)
+           for identity in line_values(lines, 'identity')):
+        security_ids = [entry.get('id') for entry in entries if entry.get('mode') == 'security']
+        checks.append(('fold-missing', 'missing security folds', [entry.get('id') for entry in entries
+                       if entry.get('mode') == 'health' and entry.get('word') != 'none'
+                       and str(entry.get('reason', '')).startswith('touches:')
+                       and 'F-' + str(entry.get('id')) not in security_ids]))
     business = [entry for entry in entries if entry.get('mode') == 'business']
     rules = [entry for entry in entries if entry.get('kind') == 'rule']
     for rule, field, selected in [('check-record-tool', 'tool_result', entries),
@@ -410,14 +452,17 @@ def tests_ci_failures(bodies, not_asked=''):
         return []
     if tests == not_asked or re.fullmatch(r'not checked: no CI run on head ' + HEX, tests):
         return []
-    if any(not re.fullmatch(r'CI run [A-Za-z0-9_-]+ on ' + HEX + r': (?:pass|fail)', line)
+    if any(not re.fullmatch(r'CI run [A-Za-z0-9_-]+ on ' + HEX + r': (?:pass|fail|pending|cancelled|mixed)', line)
            for line in tests.splitlines() if line.strip()):
-        return [('tests-ci-form', 'Tests run needs CI run <id> on <40 hex>: <pass|fail>')]
+        return [('tests-ci-form', 'Tests run needs CI run <id> on <40 hex>: <pass|fail|pending|cancelled|mixed>')]
     return []
 
 
-def full_failures(verdicts, bodies, head):
+def full_failures(lines, bodies, identity, inputs):
     failures = []
+    verdicts = {field: next(iter(line_values(lines, field)), '')
+                for field in ['size', 'business', 'security', 'health', 'money']}
+    head = identity['head']
     forbidden = [field for field in ['size', 'business', 'security', 'health']
                  if verdict_word(verdicts[field]) == 'not asked' or
                  (field in ['security', 'health'] and verdict_word(verdicts[field]) == 'not checked')]
@@ -432,8 +477,34 @@ def full_failures(verdicts, bodies, head):
     if not valid_money(verdicts['money']):
         failures.append(('full-money', 'missing or invalid money line'))
     plan = bodies.get('Split plan', '')
-    if plan and 'Split plan' not in missing and not re.match(r'not needed(?=$|:)', plan):
+    identity_index = next(index for index, line in enumerate(lines) if line.startswith('identity:'))
+    cap = CAP_LINE in lines[:identity_index]
+    if cap and (plan.startswith('not needed') or not re.search(GROUP_LINE, plan, re.MULTILINE)
+                or not inputs['split-plan.json']['groups']):
+        failures.append(('override-split-plan', 'override needs real split groups'))
+    if not cap and plan and 'Split plan' not in missing and not re.match(r'not needed(?=$|:)', plan):
         failures.append(('full-split-plan', 'Split plan must say not needed'))
+    if any('not checked: PR over the cap' in line for line in lines):
+        failures.append(('override-not-checked', 'full packets must not stop at the cap'))
+    health_ids = [entry.get('id') for entry in inputs['check-record.json']['entries']
+                  if entry.get('mode') == 'health']
+    absent = [key for key in [*(f'H{n}' for n in range(1, 12)), *(f'T{n}' for n in range(1, 9))]
+              if key not in health_ids]
+    if absent:
+        failures.append(('full-health-ids', 'missing health ids: ' + ', '.join(absent)))
+    # Cases: absent, 1 valid line, repeated lines, and lines below a heading.
+    block_end = next((index for index, line in enumerate(lines) if line.startswith('## ')), len(lines))
+    laravel = [line for line in lines[:block_end] if line.startswith('Laravel:')]
+    if len(laravel) != 1 or not re.fullmatch(
+            r'Laravel: project [^,\n]*[^,\s], card docs [0-9]+\.x(?:, from the constraint, not the lock)?',
+            laravel[0]):
+        failures.append(('full-laravel-line', 'verdict block needs exactly 1 valid Laravel line'))
+    translations = bodies.get('Behaviour changed', '').splitlines()
+    if not any(line == 'no translation files changed' or
+               (line.startswith('Translations by page: ') and
+                not line[len('Translations by page: '):].startswith('not checked: PR over the cap'))
+               for line in translations):
+        failures.append(('full-translations', 'Behaviour changed needs translations by page or no translation changes'))
     return failures + tests_ci_failures(bodies)
 
 
@@ -537,8 +608,14 @@ def packet_type_failures(lines, inputs):
                 for field in ['size', 'business', 'security', 'health', 'money']}
     bodies = field_bodies(lines)
     failures = rerun_failures(lines, inputs, identity) + rerun_field_failures(lines, identity)
+    tests = bodies.get('Tests run', '')
+    no_ci = re.fullmatch(r'not checked: no CI run on head ' + HEX, tests)
+    ci_heads = inputs.get('ci-run-heads')
+    ci_failures = []
+    if no_ci and ci_heads is not None and identity['head'].lower() in ci_heads:
+        ci_failures.append(('tests-no-ci-false', 'saved CI runs include the PR head'))
     if identity['mode'] != 'full':
-        return failures + single_failures(verdicts, bodies, identity)
+        return failures + single_failures(verdicts, bodies, identity) + ci_failures
     identity_index = next(index for index, line in enumerate(lines) if line.startswith('identity:'))
     cap = CAP_LINE in lines[:identity_index]
     if any(line.startswith('reviewed over the cap') for line in lines) and not cap:
@@ -552,10 +629,7 @@ def packet_type_failures(lines, inputs):
     if cap:
         if not size_fail:
             failures.append(('override-size-fail', 'reviewed over the cap requires size fail'))
-        if any(verdicts[field].startswith('not checked: PR over the cap')
-               for field in ['business', 'security', 'health']):
-            failures.append(('override-not-checked', 'override verdicts must not stop at the cap'))
-    return failures + full_failures(verdicts, bodies, identity['head'])
+    return failures + full_failures(lines, bodies, identity, inputs) + ci_failures
 
 
 def main(args):
@@ -574,6 +648,7 @@ def main(args):
     if not text.strip():
         raise ValueError('packet.md is empty')
     inputs, missing = read_inputs(folder)
+    inputs['ci-run-heads'] = ci_run_heads(folder)
     lines = text.splitlines()
     failures = (rule_failures(text) + record_failures(lines, inputs) + split_failures(lines, inputs)
                 + packet_type_failures(lines, inputs))
