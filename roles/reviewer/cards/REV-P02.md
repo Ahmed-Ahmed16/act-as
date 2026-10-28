@@ -8,7 +8,6 @@ mode: all
 trigger: Before a reviewer action is sent or committed
 kind: source-advice
 source: OWASP LLM06:2025 Excessive Agency, Prevention and Mitigation Strategies, Require user approval, https://genai.owasp.org/llmrisk/llm062025-excessive-agency/, read 2026-10-26
-anchor: "require a human to approve high-impact actions before they are taken"
 status: approved
-review: drafted by gpt-6-luna effort max, 2026-10-26 (relay record); checked against the raw source by claude-sonnet-5-5, 2026-10-26, CHECK PASS: anchor verbatim in LLM06 item 6; supports human approval, the action list and dry run are project choices; approved by Ahmed 2026-10-26, as drafted
+review: drafted by gpt-6-luna effort max, 2026-10-26 (relay record); checked against the raw source by claude-sonnet-5-5, 2026-10-26, CHECK PASS: anchor verbatim in LLM06 item 6; supports human approval, the action list and dry run are project choices; approved by Ahmed 2026-10-26, as drafted; edited 2026-10-28 for licence (Ahmed's call 5), anchor removed
 extra: OWASP supports human approval for high impact actions; the exact action list and --dry-run restriction are project choices. This checkout has no debate-review implementation, so support for that flag is not checked.
