@@ -206,7 +206,8 @@ class SplitBuildTests(unittest.TestCase):
                     self.hunks[field] = original
 
     def test_M17_ci_and_main_need_valid_states_and_evidence(self):
-        for ci in [dict(state='guess'), dict(state='read', workflows=[dict(on_text='push:')]),
+        for ci in [dict(state='guess'), dict(state='unreadable'), dict(state='unreadable', reason=' '),
+                   dict(state='read'), dict(state='read', workflows=[dict(on_text='push:')]),
                    dict(state='read', workflows=[dict(path='ci.yml', on_text=' ')])]:
             with self.subTest(ci=ci):
                 self.plan['ci'] = ci

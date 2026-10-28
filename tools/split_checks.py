@@ -305,8 +305,11 @@ def metadata_failures(hunks, saved, files_sha256, plan):
     if any(hunks[field] != saved[field] for field in ('base', 'head')) or hunks['files_sha256'] != files_sha256:
         failures.append(('hunks-stale', 'hunks must match the saved commits and files bytes'))
     ci, main = plan.get('ci', {}), plan.get('main', {})
-    if ci.get('state') not in ('read', 'unreadable') or (ci.get('state') == 'read' and any(
-            not nonempty(flow.get('path')) or not nonempty(flow.get('on_text')) for flow in ci.get('workflows', []))):
+    # The short packet prints reason when unreadable and every workflow when read.
+    if ci.get('state') not in ('read', 'unreadable') or (
+            ci.get('state') == 'unreadable' and not nonempty(ci.get('reason'))) or (
+            ci.get('state') == 'read' and (not isinstance(ci.get('workflows'), list) or any(
+            not nonempty(flow.get('path')) or not nonempty(flow.get('on_text')) for flow in ci['workflows']))):
         failures.append(('split-ci-input', 'CI needs a reading state and complete workflow records'))
     if main.get('state') not in ('established', 'not established') or not nonempty(main.get('evidence')):
         failures.append(('split-main-input', 'main needs a state and evidence'))
