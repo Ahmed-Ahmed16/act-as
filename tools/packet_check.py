@@ -42,6 +42,8 @@ Missing entry fields exit 1, using input-fields if no other rule fails.
 Full and security identity modes require S1 through S22, L1, L5 plus required_ids.
 Record checks precede hunk checks and exact ordered group line comparisons.
 Only counted file hunks contribute lines. Unknown hunk ids contribute 0.
+Pieces use f1h1:L1-L4, with both ends included. Counted hunk pieces must
+cover every changed line once. Operations such as f1op allow no range.
 Hunk placement checks skip not needed and size mode fail with not asked.
 
 Packet types add rules to these common checks. Full packets need size
@@ -183,14 +185,57 @@ def record_failures(lines, inputs):
     return failures
 
 
+def parse_piece(piece):
+    # Cases: whole, range, zero, reversed, malformed, operation with range.
+    if ':' not in piece:
+        return piece, 1, None
+    match = re.fullmatch(r'(f[0-9]+h[0-9]+):L([0-9]+)-L([0-9]+)', piece)
+    if not match or not 1 <= int(match[2]) <= int(match[3]):
+        raise ValueError('bad hunk range: ' + piece)
+    return match[1], int(match[2]), int(match[3])
+
+
+def piece_coverage(counts, placements):
+    sizes, spans, failures = {}, {key: [] for key in counts}, []
+    duplicates = [key for key, count in Counter(placements).items()
+                  if count > 1 and ':' not in key]
+    for piece in placements:
+        try:
+            key, start, end = parse_piece(piece)
+            if key in counts and end is not None and end > counts[key]:
+                raise ValueError('hunk range exceeds its lines: ' + piece)
+        except ValueError as error:
+            failures.append(('hunk-range', str(error)))
+            sizes[piece] = 0
+            continue
+        sizes[piece] = (counts[key] if end is None else end - start + 1) if key in counts else 0
+        if key in spans:
+            spans[key].append((start, counts[key] if end is None else end))
+    missing = []
+    for key, ranges in spans.items():
+        cursor, gap = 1, not ranges
+        for start, end in sorted(ranges):
+            gap |= start > cursor
+            if start < cursor:
+                duplicates.append(key)
+            cursor = max(cursor, end + 1)
+        if gap or cursor <= counts[key]:
+            missing.append(key)
+    for rule, label, keys in [('hunk-unplaced', 'unplaced', missing),
+                               ('hunk-duplicate', 'duplicate', duplicates)]:
+        if keys:
+            failures.append((rule, label + ' hunks: ' + ', '.join(map(str, dict.fromkeys(keys)))))
+    return sizes, failures
+
+
 def split_failures(lines, inputs):
     plan = inputs['split-plan.json']
     hunks = [hunk for file in inputs['files.json']['files'] if file.get('kind') == 'counted'
              for hunk in file.get('hunks', [])]
     counts = {hunk.get('id'): hunk.get('counted_lines', 0) for hunk in hunks}
     groups = plan['groups']
-    placements = Counter(hunk for group in groups for hunk in group.get('hunks', []))
-    placements.update(plan['unplaced'])
+    placements = [hunk for group in groups for hunk in group.get('hunks', [])] + plan['unplaced']
+    sizes, coverage_failures = piece_coverage(counts, placements)
     bodies = field_bodies(lines)
     failures = []
     size_over_cap = (any(re.search(r'(?:^|;)\s*mode=size\s*(?:;|$)', identity)
@@ -199,17 +244,12 @@ def split_failures(lines, inputs):
     split_body = bodies.get('Split plan', '')
     if not (split_body.startswith('not needed') or
             (size_over_cap and split_body.startswith('not asked'))):
-        missing = [str(key) for key in counts if key not in placements]
-        duplicates = [str(key) for key, count in placements.items() if count > 1]
-        if missing:
-            failures.append(('hunk-unplaced', 'unplaced hunks: ' + ', '.join(missing)))
-        if duplicates:
-            failures.append(('hunk-duplicate', 'duplicate hunks: ' + ', '.join(duplicates)))
+        failures.extend(coverage_failures)
     size = re.search(r'\b([0-9]+)\s+counted lines\b', ' '.join(line_values(lines, 'size')[:1]))
     total = sum(hunk.get('counted_lines', 0) for hunk in hunks)
     if size and int(size[1]) != total:
         failures.append(('hunk-counts', f'counted lines differ: packet {int(size[1])}, hunks {total}'))
-    expected = [(group.get('name'), sum(counts.get(key, 0) for key in group.get('hunks', [])))
+    expected = [(group.get('name'), sum(sizes[key] for key in group.get('hunks', [])))
                 for group in groups]
     for rule, heading in [('split-field', 'Split plan'), ('split-message', 'Drafts, not sent')]:
         actual = [(match[1], int(match[2])) for match in re.finditer(
