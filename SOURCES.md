@@ -115,3 +115,38 @@ on 2026-10-20:
 - Scott Berkun, Making Things Happen, O'Reilly 2008. ISBN 9780596517717.
   Library record: https://openlibrary.org/isbn/9780596517717
   Card MGR-006.
+
+## Reviewer
+
+### Split plan and entry point tracing (cards REV-121 to REV-140, draft)
+
+Drafted 2026-10-28, checked 2026-10-28 by a second model, not approved. All pages read 2026-10-28.
+Cards quote at most a short anchor and say the rest in their own words.
+
+- Laravel 12.x documentation (MIT), always cited with the version in the link.
+  Routing: https://laravel.com/docs/12.x/routing . Controllers:
+  https://laravel.com/docs/12.x/controllers . Artisan console:
+  https://laravel.com/docs/12.x/artisan . Task scheduling:
+  https://laravel.com/docs/12.x/scheduling . Blade templates:
+  https://laravel.com/docs/12.x/blade . Migrations (related only):
+  https://laravel.com/docs/12.x/migrations . The controllers page is not on
+  the ticket 19 frozen page list; its sections used here were compared with 11.x.
+  Cards REV-121 to REV-126, REV-132.
+- Google engineering practices (CC BY 3.0): small CLs
+  https://google.github.io/eng-practices/review/developer/small-cls.html ,
+  reviewer speed https://google.github.io/eng-practices/review/reviewer/speed.html ,
+  CL descriptions https://google.github.io/eng-practices/review/developer/cl-descriptions.html .
+  Cards REV-127 to REV-131, REV-133, REV-136, REV-137, REV-140.
+- Linux kernel documentation, Submitting patches (GPL 2.0 only, cited by URL and
+  never copied). https://www.kernel.org/doc/html/latest/process/submitting-patches.html .
+  Card REV-133.
+- Pete Hodgson, Feature Toggles (aka Feature Flags), on martinfowler.com.
+  https://martinfowler.com/articles/feature-toggles.html .
+  Card REV-135.
+- GitHub Docs (CC BY 4.0): workflow syntax
+  https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax ,
+  about stacked pull requests
+  https://docs.github.com/en/pull-requests/get-started/about-stacked-prs .
+  Cards REV-134, REV-138, REV-139.
+- Git documentation: git-diff https://git-scm.com/docs/git-diff , gitattributes
+  https://git-scm.com/docs/gitattributes . Card REV-130.
