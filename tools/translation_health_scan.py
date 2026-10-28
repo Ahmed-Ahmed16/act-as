@@ -134,7 +134,7 @@ def receiver_context(tokens, opening, openings):
 
 def blade_sources(text):
     # Cases: quoted/unquoted echoes, nested @lang, comments, unfinished calls.
-    text = re.sub(r'\{\{--.*?--\}\}|<!--.*?-->', blank, text, flags=re.S)
+    text = re.sub(r'\{\{--.*?--\}\}|<!--.*?-->|@\{\{.*?\}\}|@\{!!.*?!!\}', blank, text, flags=re.S)
     sources, spans = [], []
     for match in re.finditer(r'\{\{|\{!!|@lang\s*\(', text):
         start, end = match.span()

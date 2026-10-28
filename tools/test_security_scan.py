@@ -440,6 +440,25 @@ class SecurityScanTests(unittest.TestCase):
         self.assertEqual(report['tools']['semgrep']['pathcheck'],
                          'pathcheck: fail, extra: unlisted.php, missing: app/Fern.php')
 
+    # Cases: nested dicts/lists, integer/normal keys, shared masks and reserved suffixes.
+    def test_nested_secret_keys_are_redacted_in_output_and_saved_json(self):
+        aws, github = 'AKIA' + 'J' * 16, 'ghp_' + 'k' * 24
+        document = {'normal': [{aws: {github: 'kept'}}], 7: 'integer'}
+        expected = {'normal': [{'[redacted]': {'[redacted]': 'kept'}}], '7': 'integer'}
+        self.assertEqual(self.scan.redact_strings(document)[7], 'integer')
+        target = self.out / 'keys.json'
+        self.scan.save_json(target, document)
+        for label, output in [('redact_output', self.scan.redact_output(json.dumps(document))),
+                              ('save_json', target.read_text(encoding='utf-8'))]:
+            with self.subTest(output=label):
+                self.assertEqual(json.loads(output), expected)
+
+    def test_redacted_key_collisions_preserve_entries_and_normal_keys(self):
+        aws, github = 'AKIA' + 'J' * 16, 'ghp_' + 'k' * 24
+        document = {aws: 'aws', github: 'github', '[redacted]#2': 'normal'}
+        self.assertEqual(self.scan.redact_strings(document),
+                         {'[redacted]': 'aws', '[redacted]#3': 'github', '[redacted]#2': 'normal'})
+
     def test_raw_tail_masks_the_whole_secret_before_cutting(self):
         token = 'ghp_' + 'T' * 24
         payload = json.dumps({'results': [], 'padding': token + '.' * 15985}).encode()
