@@ -344,5 +344,7 @@ def saved_plan(plan, index):
             else:
                 saved.setdefault('stays_over', None)
             output.append(saved)
-    return dict(groups=groups, first_group_parts=parts, **{field: plan.get(field) for field in
+    return dict(groups=groups, first_group_parts=parts,
+                unplaced_marks=placed_marks(plan.get('unplaced', []), plan.get('marks', []), index.spans),
+                **{field: plan.get(field) for field in
                 ('unplaced', 'unplaced_keys', 'unplaced_keys_check', 'loop_notes', 'main', 'ci')})
