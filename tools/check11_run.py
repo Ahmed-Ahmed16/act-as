@@ -35,6 +35,10 @@ class StepLaunchError(ValueError):
     pass
 
 
+class ProbeFailed(ValueError):
+    pass
+
+
 def git_output(repo, *args):
     completed = subprocess.run(['git', '-C', str(repo), *args], capture_output=True)
     if completed.returncode:
@@ -167,6 +171,8 @@ class Runner:
         if step.startswith('probe_'):
             evidence['stdout'] = completed.stdout
         self.steps.append(evidence)
+        if step.startswith('probe_') and completed.returncode != 0:
+            raise ProbeFailed(f'probe did not run, exit code {completed.returncode}')
         return evidence
 
 
@@ -188,7 +194,7 @@ def check_test(picked, command, runner, snapshot):
     try:
         rebuild_copy(snapshot, runner.copy)
         return run_test(picked, command, runner, snapshot)
-    except (StepTimeout, StepLaunchError, UnsafeTree) as error:
+    except (StepTimeout, StepLaunchError, UnsafeTree, ProbeFailed) as error:
         return dict(test=picked['name'], tool_result='not checked', reason=str(error),
                     word='none', steps=runner.steps)
 
