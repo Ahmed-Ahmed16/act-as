@@ -71,6 +71,9 @@ What is done, what is next, and what is still untested. Updated 2026-10-28.
    - `tools/split_plan.py hunks` binds hunk hashes to the saved full commits.
      It writes no source text. The packet check counts pieces such as
      `f1h1:L1-L4` and rejects gaps, overlaps and bad ranges.
+   - Internal `tools/split_checks.py` checks group and part placement, links,
+     rebuild steps, text only pages and records for parts over 300 lines.
+     It checks recorded evidence without running commands.
    - 11 policy cards (REV-P01 to REV-P11) and 199 source cards (REV-101 to
      REV-613), all approved by the user. `cards.py reviewer --audit` shows 0
      skipped, and CI runs it beside the tester audit.
