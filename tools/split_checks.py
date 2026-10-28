@@ -104,9 +104,11 @@ def link_failures(group, places, spans, catalog):
 def text_failures(row, group, lines, catalog):
     counted = {key for key, _ in lines if catalog[key]['counted'] > 0}
     text_only = bool(counted) and all(catalog[key]['language'] for key in counted)
-    pages = row.get('pages', group.get('pages', []))
+    keys = row.get('keys', []) + [key for key in group.get('keys', [])
+                                if row is not group and key.get('part') == row['name']]
+    pages = row.get('pages', []) + [page for page in group.get('pages', [])
+                                  if row is not group and page.get('name') in {key.get('page') for key in keys}]
     unchanged = {page.get('name') for page in pages if 'unchanged' in page}
-    keys = row.get('keys', [key for key in group.get('keys', []) if key.get('part') == row['name']])
     if (text_only and (not unchanged or any(key.get('page') not in unchanged for key in keys))
             or unchanged and not text_only):
         return [('split-text-only', row['name'] + ': unchanged pages must match text only work')]
@@ -216,7 +218,131 @@ def split_failures(files, hunks, plan):
             failures.extend(reference_failures(reference, changed, hunks['head']))
         if index > 0 and any(catalog[key]['kind'] == 'generated' for key, _ in lines) and not nonempty(group.get('rebuild')):
             failures.append(('split-rebuild-missing', group['name'] + ': generated pieces need a rebuild'))
-        failures.extend(text_failures(group, group, lines, catalog))
+        if index > 0 or not parts:
+            failures.extend(text_failures(group, group, lines, catalog))
     if groups:
         failures.extend(part_failures(parts, groups[0], PieceIndex(catalog, spans), hunks['base']))
     return failures
+
+
+def mark_failures(plan, index):
+    placed = set(coverage([piece for group in plan['groups'] for piece in group['hunks']]
+                          + plan.get('unplaced', []), index.spans))
+    failures = []
+    for mark in plan.get('marks', []):
+        if mark.get('mark') not in ('money', 'access', 'deletion', 'unsure'):
+            failures.append(('split-mark-name', 'unknown mark: ' + str(mark.get('mark'))))
+        for piece in mark['pieces']:
+            lines = set(coverage([piece], index.spans))
+            if not lines or not lines <= placed:
+                failures.append(('split-mark-place', 'mark needs a placed piece: ' + piece))
+    return failures
+
+
+def key_page_failures(key, group, places, spans):
+    if key['page'] == 'shared':
+        return []
+    pages = [page for page in group.get('pages', []) if page['name'] == key['page']]
+    if not pages:
+        return [('split-page-missing', key['key'] + ': page must belong to its group or be shared')]
+    lines = set(coverage(key['pieces'], spans))
+    page = pages[0]
+    page_lines = set(coverage(page.get('pieces', page.get('hunks', [])), spans))
+    if 'unchanged' in page:
+        return []
+    if not page_lines or not any(lines | page_lines <= place for place in places):
+        return [('split-key-page-place', key['key'] + ': key and page must share a place')]
+    return []
+
+
+def key_check_failures(group, index):
+    lines = coverage(group['hunks'], index.spans)
+    check = group.get('keys_check')
+    distinct = {(key['shape'], key['key']) for key in group.get('keys', [])}
+    if any(index.catalog[hunk]['language'] for hunk, _ in lines) and (
+            not isinstance(check, dict) or not nonempty(check.get('how')) or
+            type(check.get('keys_found')) is not int or check['keys_found'] != len(distinct)):
+        return [('split-key-missing', group['name'] + ': read and count every distinct key')]
+    return []
+
+
+def key_place_failures(key, group, places, index):
+    lines = set(coverage(key['pieces'], index.spans))
+    if (not lines or not lines <= set(coverage(group['hunks'], index.spans)) or
+            not all(index.catalog[hunk]['language'] for hunk, _ in lines) or
+            not any(lines <= place for place in places)):
+        return [('split-key-misplaced', key['key'] + ': key needs language pieces in its place')]
+    return []
+
+
+def key_failures(plan, index):
+    # Cases: no keys, shared lines, adjacent ranges, overlap, distinct locales, unplaced.
+    spans = index.spans
+    failures, identities, claims = [], set(), []
+    unplaced = dict(name='unplaced', hunks=plan.get('unplaced', []), keys=plan.get('unplaced_keys', []),
+                    keys_check=plan.get('unplaced_keys_check'))
+    for number, group in enumerate(plan['groups'] + [unplaced]):
+        failures.extend(key_check_failures(group, index))
+        for key in group.get('keys', []):
+            identity = (key['shape'], key['key'])
+            if identity in identities:
+                failures.append(('split-key-twice', key['key'] + ': key is declared twice'))
+            identities.add(identity)
+            key_lines = set(coverage(key['pieces'], spans))
+            places = [set(coverage(part['hunks'], spans)) for part in plan['parts']
+                      if part['name'] == key.get('part')] if number == 0 else [set(coverage(group['hunks'], spans))]
+            failures.extend(key_place_failures(key, group, places, index))
+            location = (number, key.get('part') if number == 0 else None)
+            if any(key_lines & previous and location != prior for previous, prior in claims):
+                failures.append(('split-key-conflict', key['key'] + ': overlapping keys claim different places'))
+            claims.append((key_lines, location))
+            failures.extend(key_page_failures(key, group, places, spans))
+    return failures
+
+
+def metadata_failures(hunks, saved, files_sha256, plan):
+    failures = []
+    if any(hunks[field] != saved[field] for field in ('base', 'head')) or hunks['files_sha256'] != files_sha256:
+        failures.append(('hunks-stale', 'hunks must match the saved commits and files bytes'))
+    ci, main = plan.get('ci', {}), plan.get('main', {})
+    if ci.get('state') not in ('read', 'unreadable') or (ci.get('state') == 'read' and any(
+            not nonempty(flow.get('path')) or not nonempty(flow.get('on_text')) for flow in ci.get('workflows', []))):
+        failures.append(('split-ci-input', 'CI needs a reading state and complete workflow records'))
+    if main.get('state') not in ('established', 'not established') or not nonempty(main.get('evidence')):
+        failures.append(('split-main-input', 'main needs a state and evidence'))
+    return failures
+
+
+def checked_index(hunks, plan):
+    catalog = {hunk['id']: hunk for hunk in hunks['hunks'] + hunks['ops']}
+    spans = {}
+    for piece in piece_names(plan):
+        try:
+            spans[piece] = piece_span(piece, catalog)
+        except (KeyError, ValueError):
+            continue  # split_failures reports invalid pieces before a plan can be saved.
+    return PieceIndex(catalog, spans)
+
+
+def placed_marks(pieces, marks, spans):
+    lines = set(coverage(pieces, spans))
+    return list(dict.fromkeys(mark['mark'] for mark in marks if lines & set(coverage(mark['pieces'], spans))))
+
+
+def saved_plan(plan, index):
+    groups, parts = [], []
+    for rows, output in [(plan['groups'], groups), (plan['parts'], parts)]:
+        for row in rows:
+            counted = sum(index.catalog[hunk]['counted'] > 0 for hunk, _ in coverage(row['hunks'], index.spans))
+            saved = dict(row, counted=counted, marks=placed_marks(row['hunks'], plan.get('marks', []), index.spans))
+            for field, default in dict(summary='', needs=[], rebuild='').items():
+                saved.setdefault(field, default)
+            if output is groups:
+                saved['estimate'] = counted
+                for field, default in dict(entry_points=[], links=[], pages=[], keys=[], keys_check=None).items():
+                    saved.setdefault(field, default)
+            else:
+                saved.setdefault('stays_over', None)
+            output.append(saved)
+    return dict(groups=groups, first_group_parts=parts, **{field: plan.get(field) for field in
+                ('unplaced', 'unplaced_keys', 'unplaced_keys_check', 'loop_notes', 'main', 'ci')})
