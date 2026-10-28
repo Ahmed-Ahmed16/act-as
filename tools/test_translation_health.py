@@ -134,6 +134,27 @@ class TranslationHealthTests(unittest.TestCase):
                 self.assertEqual(sorted((call['key'], call['line']) for call in calls),
                                  [('orders.hello', 2), ('orders.hello', 4)])
 
+    def test_blade_escaped_echoes_have_no_calls_or_raw_pointers(self):
+        for source in ("@{{ __('x.a') }}", "@{!! __('x.b') !!}",
+                       "@{{\n__('x.a')\n}}", "@{!!\n__('x.b')\n!!}"):
+            with self.subTest(source=source):
+                path = self.write('resources/views/cart.blade.php', source)
+                calls, raw, _ = scan_file(path, 'resources/views/cart.blade.php')
+                self.assertEqual((calls, raw), ([], []))
+
+    def test_blade_plain_calls_beside_escaped_echoes_keep_their_lines(self):
+        source = '\n'.join([
+            "@{{\n__('x.a')\n}} {{ __('x.c') }}",
+            "@{!!\n__('x.b')\n!!} {!! __('x.d') !!}",
+            "@lang('x.e')",
+        ])
+        path = self.write('resources/views/cart.blade.php', source)
+        calls, raw, _ = scan_file(path, 'resources/views/cart.blade.php')
+        self.assertEqual([(call['key'], call['line']) for call in calls],
+                         [('x.c', 3), ('x.d', 6), ('x.e', 7)])
+        self.assertEqual(raw, [dict(path='resources/views/cart.blade.php', line=6,
+                                   key='x.d', args_escaped=True)])
+
     def test_placeholders_come_from_report_and_count_is_ignored(self):
         self.assertEqual(self.report()['check3'], [])
         self.orders['ar']['hello'] = 'مرحبا'
