@@ -284,7 +284,7 @@ Before each step, run `cards.py reviewer health <step number>`, for example
     needs a record of old behaviour and proof) when the PR is a refactor or
     cleanup. Ask question 32 (docs updated when behaviour or setup changed)
     when the `docs-guard` trigger fires, and also when the PR adds behaviour
-    that no document mentions. Question 12 (one actor per class) is not 1 of
+    that no document mentions. Question 12 (1 actor per class) is not 1 of
     the 16. Ask it only when the pointer map in step 17 sends you there, and
     then run step 21 to load its card. Questions 14 and 19 are not asked in v1 (open). Questions 24 to 29
     belong to size and the packet; question 30 belongs to security. A design
@@ -323,7 +323,7 @@ Before each step, run `cards.py reviewer health <step number>`, for example
     (`REV-P08`). Save the end snapshot and compare it with the start one.
 21. **Question 12, only on a pointer.** Run this step only when the pointer
     map in step 17 sends you to question 12: a long class, or many routes on
-    1 controller. Never run it on its own. Ask question 12 (one actor per
+    1 controller. Never run it on its own. Ask question 12 (1 actor per
     class) for that class or controller only, and answer it like the other
     questions.
     Question 12 card: `REV-512`.
