@@ -173,6 +173,7 @@ Before each step, run `cards.py reviewer health <step number>`, for example
     was already there and the PR only touched its file. It is `must fix` only
     with a shown burden (the PR made the 2nd copy) and a small fix named in
     1 line (for example "move the list to `config/uploads.php`"). No copy: `clean`.
+    An `incomplete` result is `not checked` because the search hit its cap.
     Fixed list and copy search cards: `REV-445`, `REV-446`.
 15. **H11 and the independent check (tests that prove nothing).** Reading
     picks the tests; the tool breaks the code. Pick at most 3 tests that
