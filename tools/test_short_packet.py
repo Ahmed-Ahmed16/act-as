@@ -189,16 +189,18 @@ class ShortPacketTests(ShortPacketBase):
                                          reason=STOP, base_read='', head_read=''))
         self.assertEqual(self.read('rules-pages.json'), dict(areas=[]))
 
-    def test_B23_role_keeps_scaffold_and_lists_split_steps(self):
+    def test_B23_role_keeps_split_steps_without_scaffold(self):
         text = (ROOT / 'roles/reviewer/modes/full.md').read_text(encoding='utf-8')
-        self.assertIn('1. **Scaffold.** Filled by ticket 39. Until then this mode does nothing but\n   open.', text)
+        self.assertIn('1. **Freeze, folder and size.**', text)
+        self.assertNotIn('scaffold', text.lower())
+        self.assertNotIn('Filled by ticket 39', text)
+        text = text[text.index('2. **Split step.**'):].split('\n3. ', 1)[0]
         self.assertIn('2. **Split step.**', text)
         for letter in 'abcdefghij':
             self.assertIn('   ' + letter + '. ', text)
         for token in ['cards.py reviewer full 2', 'hunks', 'build', 'short_packet.py', 'packet_check.py',
                       'Translations by page: ' + STOP]:
             self.assertIn(token, text)
-        self.assertNotIn('safe to merge', text)
 
     def test_B25_rename_and_binary_operations_pass_the_checker(self):
         self.prepare(operations=True)
