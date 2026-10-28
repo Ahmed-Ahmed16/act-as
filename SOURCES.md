@@ -118,9 +118,9 @@ on 2026-10-20:
 
 ## Reviewer
 
-### Split plan and entry point tracing (cards REV-121 to REV-140, draft)
+### Split plan and entry point tracing (cards REV-121 to REV-140)
 
-Drafted 2026-10-28, checked 2026-10-28 by a second model, not approved. All pages read 2026-10-28.
+Drafted 2026-10-28, checked 2026-10-28 by a second model, approved by Ahmed 2026-10-28. All pages read 2026-10-28.
 Cards quote at most a short anchor and say the rest in their own words.
 
 - Laravel 12.x documentation (MIT), always cited with the version in the link.
@@ -149,4 +149,5 @@ Cards quote at most a short anchor and say the rest in their own words.
   https://docs.github.com/en/pull-requests/get-started/about-stacked-prs .
   Cards REV-134, REV-138, REV-139.
 - Git documentation: git-diff https://git-scm.com/docs/git-diff , gitattributes
-  https://git-scm.com/docs/gitattributes . Card REV-130.
+  https://git-scm.com/docs/gitattributes . Card REV-130. URL only, nothing
+  copied (GPL 2.0).

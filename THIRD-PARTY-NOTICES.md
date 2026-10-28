@@ -18,7 +18,7 @@ No text is copied from them.
 
 ## Documentation cited by the reviewer split plan cards
 
-Draft cards REV-121 to REV-140 paraphrase the pages below and quote at most a
+Cards REV-121 to REV-140 paraphrase the pages below and quote at most a
 short anchor. No page is copied. Where a card says something in other words,
 the words are ours and mark a change. Pages read 2026-10-28.
 
