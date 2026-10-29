@@ -25,8 +25,10 @@ What is done, what is next, and what is still untested. Updated 2026-10-28.
 ## Next
 
 0. **Reviewer v1.1** (v1 shipped with gates case 3 and case 5 only, 2026-10-29):
+   - case 6 (58) passed on Opus 5.5, 2026-10-29: fail PR and pass PR, after
+     business step 3 got the drafts folder lookup (1 of 2 runs had missed it);
    - gate runs deferred: case 2 (51), case 4 (53), case 9 (55), case 11 (56),
-     cases 1 and 7 (57), case 6 (58), final gate (59, the only one on 2 models);
+     cases 1 and 7 (57), final gate (59, the only one on 2 models);
      full mode runs on pr31 and pr49 (ticket 39 items X1 to X6);
    - 9 low findings from the v1 code review, not fixed yet:
      `packet_check.py` needs files.json even for a business only or health only
