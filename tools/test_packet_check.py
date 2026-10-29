@@ -8,8 +8,11 @@ import unittest
 from pathlib import Path
 
 if __package__:
+    from . import packet_check, size_counter
     from .packet_check import bad_verdicts
 else:
+    import packet_check
+    import size_counter
     from packet_check import bad_verdicts
 
 
@@ -110,18 +113,30 @@ class PacketCheckTests(unittest.TestCase):
         for filename, contents in self.inputs.items():
             (self.packet / filename).write_text(json.dumps(contents), encoding='utf-8')
 
-    def split_packet(self):
-        self.inputs['split-plan.json']['groups'] = [
-            dict(name='orchard', entry_points=['orchard.py'], estimate=70, hunks=['h1']),
-            dict(name='grove', entry_points=['grove.py'], estimate=50, hunks=['h2'])]
+    def counted_hunks(self, first, second):
+        self.inputs['files.json']['files'][0].update(
+            counted_lines=first + second, hunks=[{'id': 'h1', 'counted_lines': first},
+                                                {'id': 'h2', 'counted_lines': second}])
         self.write_inputs()
-        groups = 'group: orchard, 70 counted lines\ngroup: grove, 50 counted lines'
+
+    def size_fail_packet(self):
+        self.counted_hunks(181, 120)
+        return replace_line(single_packet('size'), 'size', 'fail, 301 counted lines')
+
+    def split_packet(self, counts=(70, 50)):
+        first, second = counts
+        self.counted_hunks(first, second)
+        self.inputs['split-plan.json']['groups'] = [
+            dict(name='orchard', entry_points=['orchard.py'], estimate=first, hunks=['h1']),
+            dict(name='grove', entry_points=['grove.py'], estimate=second, hunks=['h2'])]
+        self.write_inputs()
+        groups = f'group: orchard, {first} counted lines\ngroup: grove, {second} counted lines'
         packet = replace_body(single_packet(), 'Split plan', groups)
         return replace_body(packet, 'Drafts, not sent', groups)
 
-    def short_packet(self):
-        packet = self.split_packet().replace('mode=business', 'mode=full')
-        packet = replace_line(packet, 'size', 'fail, 120 counted lines')
+    def short_packet(self, counts=(181, 120)):
+        packet = self.split_packet(counts).replace('mode=business', 'mode=full')
+        packet = replace_line(packet, 'size', f'fail, {sum(counts)} counted lines')
         for field in ['business', 'security', 'health', 'money']:
             packet = replace_line(packet, field, STOP)
         for heading in HEADINGS[1:6]:
@@ -162,13 +177,45 @@ class PacketCheckTests(unittest.TestCase):
     def test_short_packet_passes(self):
         self.assert_pass(self.short_packet())
 
+    # Cases: both wrong verdicts, exactly 300/301, not asked with a count.
+    def test_size_pass_450_is_rejected(self):
+        self.inputs['files.json']['files'][0].update(
+            counted_lines=450, hunks=[{'id': 'h1', 'counted_lines': 450}])
+        self.write_inputs()
+        self.assert_rule(replace_line(good_packet(), 'size', 'pass, 450 counted lines, cap 300'),
+                         'size-verdict',
+                         'size verdict pass does not match 450 counted lines against cap 300')
+
+    def test_size_fail_120_short_packet_is_rejected(self):
+        self.assert_rule(self.short_packet((70, 50)), 'size-verdict',
+                         'size verdict fail does not match 120 counted lines against cap 300')
+
+    def test_size_verdict_boundaries_are_accepted(self):
+        for total, verdict in [(300, 'pass'), (301, 'fail')]:
+            with self.subTest(total=total):
+                self.inputs['files.json']['files'][0].update(
+                    counted_lines=total, hunks=[{'id': 'h1', 'counted_lines': total}])
+                self.write_inputs()
+                packet = replace_line(single_packet('size'), 'size',
+                                      f'{verdict}, {total} counted lines, cap 300')
+                plan = 'not needed: fits' if verdict == 'pass' else 'not asked: size run only'
+                self.assert_pass(replace_body(packet, 'Split plan', plan))
+
+    def test_not_asked_size_count_is_untouched_by_size_verdict(self):
+        packet = replace_line(single_packet(), 'size', 'not asked, 450 counted lines')
+        self.inputs['files.json']['files'][0]['hunks'] = [{'id': 'h1', 'counted_lines': 450}]
+        self.assertEqual(packet_check.split_failures(packet.splitlines(), self.inputs), [])
+
+    def test_packet_and_counter_caps_agree(self):
+        self.assertEqual(packet_check.CAP, size_counter.CAP)
+
     def test_single_mode_packet_passes(self):
         self.inputs['check-record.json']['entries'] = self.inputs['check-record.json']['entries'][-2:]
         self.write_inputs()
         self.assert_pass(single_packet())
 
     def test_single_size_over_cap_not_asked_passes(self):
-        packet = replace_line(single_packet('size'), 'size', 'fail, 120 counted lines')
+        packet = self.size_fail_packet()
         self.assert_pass(replace_body(packet, 'Split plan', 'not asked: size run only'))
 
     def test_g14_size_mode_saved_examples_pass_packet_check(self):
@@ -201,7 +248,7 @@ class PacketCheckTests(unittest.TestCase):
                 self.assert_pass(packet)
 
     def test_single_size_over_cap_not_checked_passes(self):
-        packet = replace_line(single_packet('size'), 'size', 'fail, 120 counted lines')
+        packet = self.size_fail_packet()
         for field in ['business', 'security', 'health']:
             packet = replace_line(packet, field, STOP)
         self.assert_pass(replace_body(packet, 'Split plan', 'not asked: size run only'))
@@ -209,15 +256,15 @@ class PacketCheckTests(unittest.TestCase):
     # Cases: exact stop text, other plan text, groups in either body,
     # absent or repeated placements, empty drafts, and other packet modes.
     def test_single_size_over_cap_pass_verdicts_fail_single_mode_line(self):
-        packet = replace_line(single_packet('size'), 'size', 'fail, 120 counted lines')
+        packet = self.size_fail_packet()
         packet = replace_body(packet, 'Split plan', 'not asked: size run only')
         for field in ['business', 'security', 'health']:
             packet = replace_line(packet, field, 'pass')
         self.assert_rules(packet, 'single-mode-line')
 
     def test_single_size_over_cap_groups_in_plan_fail_both_size_rules(self):
-        split = self.split_packet()
-        packet = replace_line(single_packet('size'), 'size', 'fail, 120 counted lines')
+        split = self.split_packet((181, 120))
+        packet = self.size_fail_packet()
         groups = split.split('## Split plan\n', 1)[1].split('\n## ', 1)[0].strip()
         packet = replace_body(packet, 'Split plan', groups)
         for draft, extra_rules in [(groups, []), ('Draft: Ask about orchard.', ['split-message'])]:
@@ -226,7 +273,7 @@ class PacketCheckTests(unittest.TestCase):
                                   'size-split-plan', 'size-no-draft', *extra_rules)
 
     def test_single_size_over_cap_groups_in_drafts_fail_size_no_draft(self):
-        packet = replace_line(single_packet('size'), 'size', 'fail, 120 counted lines')
+        packet = self.size_fail_packet()
         packet = replace_body(packet, 'Split plan', 'not asked: size run only')
         for prefix in ['', '  ', '- ', '* ']:
             with self.subTest(prefix=prefix):
@@ -237,7 +284,7 @@ class PacketCheckTests(unittest.TestCase):
     def test_single_size_over_cap_other_plan_text_fails_size_split_plan(self):
         self.inputs['split-plan.json']['unplaced'] = ['h1', 'h2']
         self.write_inputs()
-        packet = replace_line(single_packet('size'), 'size', 'fail, 120 counted lines')
+        packet = self.size_fail_packet()
         for body in ['not needed: x', 'Separate cart changes.',
                      'not asked: business run only', 'not asked: size run only\nExtra text.']:
             with self.subTest(body=body):
@@ -246,7 +293,7 @@ class PacketCheckTests(unittest.TestCase):
     def test_single_size_over_cap_skips_duplicate_and_unplaced_hunks(self):
         self.inputs['split-plan.json']['unplaced'] = ['h1', 'h1']
         self.write_inputs()
-        packet = replace_line(single_packet('size'), 'size', 'fail, 120 counted lines')
+        packet = self.size_fail_packet()
         self.assert_pass(replace_body(packet, 'Split plan', 'not asked: size run only'))
 
     def test_other_packets_not_asked_plan_still_checks_hunks(self):
@@ -256,7 +303,7 @@ class PacketCheckTests(unittest.TestCase):
                 self.assert_rules(packet, 'hunk-unplaced')
 
     def test_single_size_over_cap_drafts_still_need_content(self):
-        packet = replace_line(single_packet('size'), 'size', 'fail, 120 counted lines')
+        packet = self.size_fail_packet()
         packet = replace_body(packet, 'Split plan', 'not asked: size run only')
         self.assert_rules(replace_body(packet, 'Drafts, not sent', ''), 'missing-part')
 
@@ -366,7 +413,8 @@ class PacketCheckTests(unittest.TestCase):
         self.assert_rules(replace_line(self.override_packet(), 'size', 'fail'), 'full-size-counts')
 
     def test_override_cap_line_after_identity(self):
-        self.assert_rules(replace_line(good_packet(), 'size', 'fail, 120 counted lines') + CAP_LINE + '\n',
+        self.counted_hunks(181, 120)
+        self.assert_rules(replace_line(good_packet(), 'size', 'fail, 301 counted lines') + CAP_LINE + '\n',
                           'override-cap-line', 'cross-size-fail')
 
     def test_override_not_checked_over_cap(self):
@@ -468,7 +516,8 @@ class PacketCheckTests(unittest.TestCase):
                 self.assert_pass(single_packet(mode))
 
     def test_cross_size_fail_other_lines_checked(self):
-        self.assert_rules(replace_line(good_packet(), 'size', 'fail, 120 counted lines'), 'cross-size-fail')
+        self.counted_hunks(181, 120)
+        self.assert_rules(replace_line(good_packet(), 'size', 'fail, 301 counted lines'), 'cross-size-fail')
 
     def test_rerun_line_missing_with_business_rerun_claim(self):
         packet = replace_line(good_packet(), 'business', 'pass, business rerun rebuilt orchard')

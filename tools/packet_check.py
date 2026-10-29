@@ -98,6 +98,7 @@ from datetime import date
 from pathlib import Path
 
 FAILED_SHAPE = 1
+CAP = 300
 HEADINGS = ['Behaviour changed', 'Files that matter most', 'Tests run',
             'Not checked', 'Known risks', 'Pointers', 'Split plan', 'Drafts, not sent']
 HEX = r'[0-9a-fA-F]{40}'
@@ -291,6 +292,10 @@ def split_failures(lines, inputs):
     total = sum(hunk.get('counted_lines', 0) for hunk in hunks)
     if size and int(size[1]) != total:
         failures.append(('hunk-counts', f'counted lines differ: packet {int(size[1])}, hunks {total}'))
+    word = verdict_word(' '.join(line_values(lines, 'size')[:1]))
+    if size and word in ('pass', 'fail') and ((int(size[1]) <= CAP) != (word == 'pass')):
+        failures.append(('size-verdict', f'size verdict {word} does not match {int(size[1])}'
+                         f' counted lines against cap {CAP}'))
     expected = [(group.get('name'), sum(sizes[key] for key in group.get('hunks', [])))
                 for group in groups]
     for rule, heading in [('split-field', 'Split plan'), ('split-message', 'Drafts, not sent')]:

@@ -137,6 +137,34 @@ class SizeCounterTests(unittest.TestCase):
         self.assertEqual(self.file_rows(folder), [dict(path='orchard.bin', old_path='',
                          status='added', kind='counted', counted_lines=0, hunks=[])])
 
+    # Cases: -diff/binary on text, text on real binary, default attributes above.
+    def test_binary_attributes_cannot_hide_900_text_lines(self):
+        self.write('app/a.php', '<?php\n')
+        self.base = self.commit()
+        for attribute in ('-diff', 'binary'):
+            with self.subTest(attribute=attribute):
+                self.write('.gitattributes', '*.php ' + attribute + '\n')
+                self.write('app/big.php', 'fruit\n' * 900)
+                folder = self.root / 'packet'
+                report = self.count(self.commit(), '--out', folder)
+                self.assertEqual(report['counted_total'], 901)
+                self.assertEqual(report['verdict'], 'fail')
+                rows = self.file_rows(folder)
+                self.assertEqual(sum(hunk['counted_lines'] for row in rows
+                                     for hunk in row['hunks']), 901)
+                for row in rows:
+                    self.assertEqual(sum(hunk['counted_lines'] for hunk in row['hunks']),
+                                     row['counted_lines'])
+
+    def test_real_binary_marked_text_still_has_0_lines_and_no_hunks(self):
+        self.write('.gitattributes', '*.bin text\n')
+        self.base = self.commit()
+        self.write('orchard.bin', b'\0fruit\xff')
+        folder = self.root / 'packet'
+        report = self.count(self.commit(), '--out', folder)
+        self.assertEqual((report['files'], report['counted_total']), (1, 0))
+        self.assertEqual(self.file_rows(folder)[0]['hunks'], [])
+
     def test_merged_without_base_prints_exact_reason(self):
         run = self.run_cli('--repo', self.repo, '--head', self.base, '--merged')
         self.assertEqual(run.returncode, 3)

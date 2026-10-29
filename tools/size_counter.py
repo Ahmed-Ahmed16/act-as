@@ -27,7 +27,10 @@ class ArgumentParser(argparse.ArgumentParser):
 
 def git_bytes(repo, *args):
     try:
-        run = subprocess.run(['git', '-c', 'core.autocrlf=false', '-C', str(repo), *args],
+        # Head attributes must not hide text changes as binary files.
+        run = subprocess.run(['git', '-c', 'core.autocrlf=false',
+                              '--attr-source=4b825dc642cb6eb9a060e54bf8d69288fbee4904',
+                              '-C', str(repo), *args],
                              capture_output=True)
     except OSError as error:
         raise GitError(f'git could not start: {error}') from error

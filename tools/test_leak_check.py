@@ -57,6 +57,41 @@ class LeakCheckTests(unittest.TestCase):
         self.assertEqual(run.stdout, 'total: 0 hits\n')
         self.assertEqual(run.stderr, '')
 
+    # Cases: UTF-8 with/without BOM, UTF-16 in either file, NUL without BOM.
+    def test_bom_terms_keep_first_term_and_index(self):
+        self.write('cand.txt', 'we work for acmecorp here\n')
+        for prefix in (b'', b'\xef\xbb\xbf'):
+            with self.subTest(prefix=prefix):
+                (self.root / 'terms.txt').write_bytes(prefix + b'acmecorp\nsecret\n')
+                run = self.run_check('terms.txt', 'cand.txt')
+                self.assertEqual(run.returncode, 1, run.stdout + run.stderr)
+                self.assertEqual(run.stdout,
+                                 'cand.txt:1: group-or-term-index 1\ntotal: 1 hits\n')
+
+    def test_utf16_bom_in_candidate_or_terms_finds_line_1(self):
+        for terms_encoding, candidate_encoding in (('utf-8', 'utf-16'),
+                                                    ('utf-16', 'utf-8')):
+            with self.subTest(terms=terms_encoding, candidate=candidate_encoding):
+                (self.root / 'terms.txt').write_text('acmecorp\n', encoding=terms_encoding)
+                (self.root / 'cand.txt').write_text('we work for acmecorp here\r\n',
+                                                   encoding=candidate_encoding)
+                run = self.run_check('terms.txt', 'cand.txt')
+                self.assertEqual(run.returncode, 1, run.stdout + run.stderr)
+                self.assertEqual(run.stdout,
+                                 'cand.txt:1: group-or-term-index 1\ntotal: 1 hits\n')
+
+    def test_nul_without_bom_exits_2_without_private_details(self):
+        self.write('hit.txt', 'zorblax-corp\n')
+        (self.root / 'private.bin').write_bytes(b'private-content\x00zorblax-corp')
+        for args, kind in [(('terms.txt', 'private.bin'), 'candidate file'),
+                           (('private.bin', 'hit.txt'), 'terms file')]:
+            with self.subTest(kind=kind):
+                run = self.run_check(*args)
+                self.assertEqual(run.returncode, 2, run.stdout + run.stderr)
+                self.assertEqual(run.stderr, f'leak_check.py: cannot read {kind}: not text\n')
+                for private in ('private.bin', 'private-content', 'zorblax-corp'):
+                    self.assertNotIn(private, run.stderr)
+
     def test_invalid_inputs_exit_2_with_safe_reason(self):
         self.write('empty-terms.txt', '\n  \n# comment\n# another comment\n')
         (self.root / 'folder').mkdir()
@@ -91,9 +126,24 @@ class LeakCheckTests(unittest.TestCase):
         run = self.run_check('terms.txt', 'ids.txt')
         self.assertEqual(run.returncode, 1, run.stderr)
         self.assertEqual(run.stdout.splitlines(), [
+            'ids.txt:1: group-or-term-index 1',
+            'ids.txt:2: group-or-term-index 2',
             'ids.txt:4: group-or-term-index 1',
             'ids.txt:5: group-or-term-index 2',
-            'ids.txt:6: group-or-term-index 3', 'total: 3 hits'])
+            'ids.txt:6: group-or-term-index 3', 'total: 5 hits'])
+
+    # Cases: wrapped/repeated whitespace, same line repeats, underscore, run on words.
+    def test_term_whitespace_and_short_term_boundaries(self):
+        self.write('terms.txt', 'acme corp\nacme\n')
+        self.write('a.md', 'we work for acme\ncorp here\n')
+        self.write('b.md', 'acme  corp acme  corp\n')
+        self.write('c.md', 'acme_internal\nacmex\nxacme\n')
+        run = self.run_check('terms.txt', 'a.md', 'b.md', 'c.md')
+        self.assertEqual(run.returncode, 1, run.stderr)
+        self.assertEqual(run.stdout.splitlines(), [
+            'a.md:1: group-or-term-index 1', 'a.md:1: group-or-term-index 2',
+            'b.md:1: group-or-term-index 1', 'b.md:1: group-or-term-index 2',
+            'c.md:1: group-or-term-index 2', 'total: 5 hits'])
 
     def test_long_or_punctuated_terms_match_literal_substrings(self):
         self.write('terms.txt', 'quuxpay\nR99-\nz.q\nABCDE\n')
@@ -117,7 +167,7 @@ class LeakCheckTests(unittest.TestCase):
             'total: 2 hits'])
 
     def test_invalid_utf8_is_replaced_and_whole_file_is_scanned(self):
-        (self.root / 'bytes.txt').write_bytes(b'\xff\x00\nzorblax-corp\xff')
+        (self.root / 'bytes.txt').write_bytes(b'\xff\nzorblax-corp\xff')
         run = self.run_check('terms.txt', 'bytes.txt')
         self.assertEqual(run.returncode, 1, run.stderr)
         self.assertEqual(run.stdout, 'bytes.txt:2: group-or-term-index 1\ntotal: 1 hits\n')

@@ -12,7 +12,8 @@ PATTERNS = {
               r'permission|role',
     'delete': r'delete|destroy|forceDelete|drop\s+table|truncate|unlink|rmtree|remove|purge',
 }
-PATTERNS = {kind: re.compile(r'(?<![a-z0-9])(?:' + words + r')(?![a-z0-9])', re.I)
+PATTERNS = {kind: re.compile(r'(?:(?<![A-Za-z0-9])|(?<=[a-z0-9])(?=[A-Z]))(?i:'
+                            + words + r')(?:(?![A-Za-z0-9])|(?<=[a-z0-9])(?=[A-Z]))')
             for kind, words in PATTERNS.items()}
 
 
@@ -44,15 +45,21 @@ def scan(args):
     if not repo.is_dir():
         raise ValueError('repo must be a directory')
     areas = []
+    unreadable = 0
     not_checked = ['business risky areas: not asked: health run only']
     for filename in args.files:
         try:
             text = changed_text(repo, filename)
         except (OSError, UnicodeError) as error:
+            unreadable += 1
             not_checked.append(f'cannot read file {filename}: {error}')
             continue
         areas.extend(file_areas(filename, text))
     found = {area['kind'] for area in areas}
+    if not areas and unreadable:
+        return outcome('not checked',
+                       f'could not read {unreadable} requested file(s); open them yourself',
+                       areas=areas, kinds_found=[], not_checked=not_checked)
     return outcome('lead' if areas else 'clean',
                    'candidates only; open the files to judge' if areas else
                    'no risky area words found in the requested files',

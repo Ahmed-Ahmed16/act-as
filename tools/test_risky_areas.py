@@ -59,6 +59,46 @@ class RiskyAreasTests(unittest.TestCase):
         self.assertEqual(document['areas'], [])
         self.assertEqual(document['kinds_found'], [])
 
+    # Cases: name humps, path humps, lowercase runs, all caps runs, snake case.
+    def test_camel_case_content_and_payment_path_keep_exact_lines(self):
+        filename = 'app/Http/PaymentController.php'
+        self.write(filename, '<?php\nfunction refundOrder(){}\nclass RefundService {}\n'
+                   'function deleteAccount(){}\nchargeCard();\ngetTotalPrice();\n'
+                   'Session::flush();\n$u->delete();\n')
+        document = self.scan(filename)
+        self.assertEqual(document['result'], 'lead')
+        self.assertEqual([(area['kind'], area['line']) for area in document['areas']],
+                         [('money', 1), ('money', 2), ('money', 3), ('delete', 4),
+                          ('money', 5), ('money', 6), ('logins', 7), ('delete', 8)])
+        self.assertTrue(all(area['file'] == filename for area in document['areas']))
+        self.write('glorp.php', 'getprice author TOTALS\nget_total_price();\n$u->delete();\n')
+        self.assertEqual([(area['kind'], area['line'])
+                          for area in self.scan('glorp.php')['areas']],
+                         [('money', 2), ('delete', 3)])
+
+    # Cases: missing/bad bytes alone or together, readable clean, mixed hits below.
+    def test_unreadable_without_hits_is_not_checked(self):
+        (self.repo / 'glorp.txt').write_bytes(b'\xff')
+        self.write('plain.txt', 'hello\n')
+        for files, failed in [(('app/Gone.php',), 1), (('glorp.txt',), 1),
+                              (('app/Gone.php', 'glorp.txt', 'plain.txt'), 2),
+                              (('plain.txt',), 0)]:
+            with self.subTest(files=files):
+                run = subprocess.run([sys.executable, '-B', str(self.script), '--repo',
+                                      str(self.repo), '--files', *files],
+                                     capture_output=True, text=True, encoding='utf-8')
+                self.assertEqual((run.returncode, run.stderr), (0, ''))
+                document = json.loads(run.stdout)
+                self.assertEqual(document['result'], 'not checked' if failed else 'clean')
+                self.assertEqual(document['areas'], [])
+                if failed:
+                    self.assertEqual(document['reason'],
+                                     f'could not read {failed} requested file(s); open them yourself')
+                    self.assertEqual(len(document['not_checked']), failed + 1)
+                    for filename in files[:failed]:
+                        self.assertTrue(any(entry.startswith(f'cannot read file {filename}: ')
+                                            for entry in document['not_checked']))
+
     def test_path_words_report_candidates_even_for_empty_files(self):
         for filename, kind in (('PRICE/glorp.txt', 'money'),
                                ('glorp_password.txt', 'logins'),
