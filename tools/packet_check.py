@@ -2,7 +2,7 @@
 
 Usage: python tools/packet_check.py <packet folder>
 Exit 0 prints packet_check: pass. Exit 1 prints 1 RULE line per failed
-text rule. Exit 2 prints 1 packet_check: error line on stderr only.
+rule. Exit 2 prints 1 packet_check: error line on stderr only.
 
 A packet contains a line '# Review packet'. Before the identity it may
 contain: reviewed over the cap, on Ahmed's word
@@ -27,11 +27,28 @@ Write unknowns as ___ (label). Each label outside Not checked needs a
 Not checked line containing ___ (label): <reason>. Bare ___ is invalid.
 The phrases safe to merge and lines starting overall or ready are invalid.
 The cap line conflicts with the exact text It was not reviewed past size.
-Only packet.md is read; evidence files and counts are not checked.
+The packet folder also needs 4 JSON objects, validated before rules run:
+check-record.json: required_ids, entries. Each entry has id, mode, area,
+kind, tool_result, reading_result, word, reason, base_read, head_read.
+files.json: files. Each file has path, old_path, status, kind,
+counted_lines, hunks. Each hunk has id, counted_lines.
+split-plan.json: groups, first_group_parts, unplaced. Each group has
+name, entry_points, estimate, hunks (hunk ids).
+rules-pages.json: areas. Each area has area, page, commit, rules.
+Each rule has id, status. All collection fields are lists.
+Counted lines must be integers. Hunk ids must be strings.
+Bad file contents or list/object shapes exit 2 and name the file.
+Missing entry fields exit 1, using input-fields if no other rule fails.
+Full and security identity modes require S1 through S22, L1, L5 plus required_ids.
+Record checks precede hunk checks and exact ordered group line comparisons.
+Only counted file hunks contribute lines. Unknown hunk ids contribute 0.
+Hunk placement checks apply unless Split plan starts with not needed.
 """
 
+import json
 import re
 import sys
+from collections import Counter
 from pathlib import Path
 
 FAILED_SHAPE = 1
@@ -46,6 +63,121 @@ CAP_LINE = "reviewed over the cap, on Ahmed's word"
 UNKNOWN = re.compile(r'___[ \t]*\(([^()\n]+)\)')
 NO_REASON = {'___', 'unknown', 'not checked', 'not checked:'}
 MONEY_END = '. Needs the separate Opus review before merge. Not done by this review.'
+INPUT_SHAPES = {
+    'check-record.json': {'required_ids': [], 'entries': dict.fromkeys(
+        'id mode area kind tool_result reading_result word reason base_read head_read'.split())},
+    'files.json': {'files': {**dict.fromkeys('path old_path status kind'.split()),
+                             'counted_lines': int, 'hunks': {'id': str, 'counted_lines': int}}},
+    'split-plan.json': {'groups': {**dict.fromkeys(['name', 'estimate']),
+                                  'entry_points': [], 'hunks': [str]},
+                        'first_group_parts': [], 'unplaced': [str]},
+    'rules-pages.json': {'areas': {**dict.fromkeys(['area', 'page', 'commit']),
+                                  'rules': dict.fromkeys(['id', 'status'])}}}
+
+
+def input_type(contents, schema, location):
+    if isinstance(schema, type):
+        if type(contents) is not schema:
+            raise ValueError(location + ' must be ' + schema.__name__)
+    elif not isinstance(contents, list):
+        raise ValueError(location + ' must be a list')
+    elif isinstance(schema, list) and schema:
+        for index, entry in enumerate(contents):
+            input_type(entry, schema[0], f'{location}[{index}]')
+
+
+def input_fields(document, schema, location):
+    if not isinstance(document, dict):
+        raise ValueError(location + ' must be an object')
+    missing = [location + '.' + field for field in schema if field not in document]
+    if missing and location.endswith('.json'):
+        raise ValueError(location + ' has missing lists')
+    for field, children in schema.items():
+        if children is None or field not in document:
+            continue
+        input_type(document[field], children, location + '.' + field)
+        if isinstance(children, dict):
+            for index, entry in enumerate(document[field]):
+                missing.extend(input_fields(entry, children, f'{location}.{field}[{index}]'))
+    return missing
+
+
+def read_inputs(folder):
+    inputs, missing = {}, []
+    for filename, schema in INPUT_SHAPES.items():
+        path = folder / filename
+        if not path.is_file():
+            raise ValueError(filename + ' is missing or not a file')
+        try:
+            document = json.loads(path.read_text(encoding='utf-8'))
+        except (OSError, UnicodeError, json.JSONDecodeError) as error:
+            raise ValueError(filename + ' is empty, unreadable, or invalid JSON') from error
+        missing.extend(input_fields(document, schema, filename))
+        inputs[filename] = document
+    return inputs, missing
+
+
+def record_failures(lines, inputs):
+    record = inputs['check-record.json']
+    entries = record['entries']
+    ids = [entry.get('id') for entry in entries]
+    required = list(record['required_ids'])
+    if any(re.search(r'(?:^|;)\s*mode=(?:full|security)\s*(?:;|$)', identity)
+           for identity in line_values(lines, 'identity')):
+        # The 24 security checks: S1 to S22, plus L1 and L5.
+        required += [f'S{number}' for number in range(1, 23)] + ['L1', 'L5']
+    checks = [('check-record-id', 'missing ids', [key for key in required if key not in ids])]
+    business = [entry for entry in entries if entry.get('mode') == 'business']
+    rules = [entry for entry in entries if entry.get('kind') == 'rule']
+    for rule, field, selected in [('check-record-tool', 'tool_result', entries),
+                                  ('check-record-reading', 'reading_result', entries),
+                                  ('check-record-area', 'area', business),
+                                  ('rule-base-read', 'base_read', rules),
+                                  ('rule-head-read', 'head_read', rules)]:
+        checks.append((rule, 'missing ' + field, [entry.get('id', '<missing>') for entry in selected
+                       if not isinstance(entry.get(field), str) or not entry[field].strip()]))
+    page_ids = [rule.get('id', '<missing>') for area in inputs['rules-pages.json']['areas']
+                for rule in area.get('rules', [])]
+    checks.append(('rule-entry-missing', 'missing rule entries', [key for key in page_ids if key not in ids]))
+    failures = [(rule, message + ': ' + ', '.join(dict.fromkeys(map(str, keys))))
+                for rule, message, keys in checks if keys]
+    security = line_values(lines, 'security')
+    if any(entry.get('mode') == 'security' and entry.get('word') == 'must fix' for entry in entries):
+        if not security or any(not re.match(r'fail\b', verdict) for verdict in security):
+            failures.append(('security-line', 'security must fix requires fail'))
+    return failures
+
+
+def split_failures(lines, inputs):
+    plan = inputs['split-plan.json']
+    hunks = [hunk for file in inputs['files.json']['files'] if file.get('kind') == 'counted'
+             for hunk in file.get('hunks', [])]
+    counts = {hunk.get('id'): hunk.get('counted_lines', 0) for hunk in hunks}
+    groups = plan['groups']
+    placements = Counter(hunk for group in groups for hunk in group.get('hunks', []))
+    placements.update(plan['unplaced'])
+    bodies = field_bodies(lines)
+    failures = []
+    if not bodies.get('Split plan', '').startswith('not needed'):
+        missing = [str(key) for key in counts if key not in placements]
+        duplicates = [str(key) for key, count in placements.items() if count > 1]
+        if missing:
+            failures.append(('hunk-unplaced', 'unplaced hunks: ' + ', '.join(missing)))
+        if duplicates:
+            failures.append(('hunk-duplicate', 'duplicate hunks: ' + ', '.join(duplicates)))
+    size = re.search(r'\b([0-9]+)\s+counted lines\b', ' '.join(line_values(lines, 'size')[:1]))
+    total = sum(hunk.get('counted_lines', 0) for hunk in hunks)
+    if size and int(size[1]) != total:
+        failures.append(('hunk-counts', f'counted lines differ: packet {int(size[1])}, hunks {total}'))
+    expected = [(group.get('name'), sum(counts.get(key, 0) for key in group.get('hunks', [])))
+                for group in groups]
+    for rule, heading in [('split-field', 'Split plan'), ('split-message', 'Drafts, not sent')]:
+        actual = [(match[1], int(match[2])) for match in re.finditer(
+            r'^[ \t]*(?:[-*] )?group: (.+), ([0-9]+) counted lines[ \t]*$',
+            bodies.get(heading, ''), re.MULTILINE)]
+        if actual != expected:
+            failures.append((rule, 'group lines differ from split-plan.json'))
+    return failures
 
 
 def line_values(lines, field):
@@ -190,7 +322,11 @@ def main(args):
         raise ValueError('packet.md is unreadable or not valid UTF-8') from error
     if not text.strip():
         raise ValueError('packet.md is empty')
-    failures = rule_failures(text)
+    inputs, missing = read_inputs(folder)
+    lines = text.splitlines()
+    failures = rule_failures(text) + record_failures(lines, inputs) + split_failures(lines, inputs)
+    if missing and not failures:
+        failures.append(('input-fields', 'missing fields: ' + ', '.join(missing)))
     for rule, message in failures:
         print(f'RULE {rule}: {message}')
     if failures:
