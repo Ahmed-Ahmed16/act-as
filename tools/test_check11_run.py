@@ -416,7 +416,8 @@ class RunTests(unittest.TestCase):
         self.assertEqual(verdict.returncode, 0, verdict.stderr)
         self.assertEqual(json.loads(verdict.stdout)['verdict'], 'fail')
         other = dict(id='S1', mode='security', note=['keep', 7])
-        baseline = [dict(real, id=f'H{n}', tool_result='clean', word='none') for n in range(1, 11)]
+        baseline = [dict(real, id=name, tool_result='clean', word='none')
+                    for name in [f'H{n}' for n in range(1, 11)] + [f'T{n}' for n in range(1, 9)]]
         saved.update(required_ids=['H11'], extra=dict(keep=True), entries=[other, *baseline, real])
         self.record.write_text(json.dumps(saved))
         self.spec['tests'] = [self.pick('fake', 'harmless')]
@@ -425,7 +426,7 @@ class RunTests(unittest.TestCase):
         self.assertEqual(updated['entries'][0], other)
         self.assertEqual(updated['extra'], saved['extra'])
         self.assertEqual(updated['required_ids'], ['H11'])
-        self.assertEqual(len(updated['entries']), 12)
+        self.assertEqual(len(updated['entries']), 20)
         self.assertEqual(updated['entries'][1:-1], baseline)
         self.assertEqual(updated['entries'][-1]['tool_result'], 'not checked')
         verdict = self.script('health_verdict.py', '--record', str(self.record))
