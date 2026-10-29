@@ -246,6 +246,40 @@ class PacketCheckTests(unittest.TestCase):
     def test_rerun_packet_passes(self):
         self.assert_pass(self.rerun_packet())
 
+    def test_generated_all_pass_verdict_passes_rerun_packet_check(self):
+        # G10/G15: the generated verdict must name every saved area.
+        self.inputs['rules-pages.json']['areas'].append(
+            dict(area='grove', page='grove.md', commit='e' * 40, rules=[]))
+        self.write_inputs()
+        areas = self.root / 'business-areas.json'
+        script = Path(__file__).with_name('business_verdict.py')
+        # N3: a draft notice must survive the verdict and the rerun packet check.
+        for reason, suffix in [('rules kept', ''),
+                               ('rules page: draft, not in the repo yet',
+                                ', rules page: draft, not in the repo yet')]:
+            with self.subTest(reason=reason):
+                areas.write_text(json.dumps({'areas': [
+                    dict(area='orchard', state='pass', reason=reason),
+                    dict(area='grove', state='pass', reason='rules kept')]}), encoding='utf-8')
+                run = subprocess.run([sys.executable, '-B', str(script), 'verdict', '--areas', str(areas)],
+                                     capture_output=True, text=True, encoding='utf-8', timeout=10)
+                self.assertEqual(run.returncode, 0, run.stderr)
+                self.assertEqual(run.stdout, 'business: pass, area orchard: every rule kept'
+                                 + suffix + '; area grove: every rule kept\n')
+                packet = replace_line(self.rerun_packet(), 'business',
+                                      run.stdout.strip().removeprefix('business: '))
+                self.assert_pass(packet)
+
+    def test_rr6_identity_instruction_produces_valid_rerun_packet(self):
+        # G13/G16: apply RR6's identity setting before the packet check.
+        mode = Path(__file__).resolve().parents[1] / 'roles/reviewer/modes/business.md'
+        rr6 = mode.read_text(encoding='utf-8').split('RR6.', 1)[1].split('\n## ', 1)[0]
+        settings = re.findall(r'`(rerun=[^`]+)`', rr6)
+        packet = self.rerun_packet().replace('; rerun=yes', '')
+        if settings:
+            packet = packet.replace('date=2026-10-26', 'date=2026-10-26; ' + settings[0])
+        self.assert_pass(packet)
+
     def test_full_size_counts_missing(self):
         self.assert_rules(replace_line(good_packet(), 'size', 'pass'), 'full-size-counts')
 
