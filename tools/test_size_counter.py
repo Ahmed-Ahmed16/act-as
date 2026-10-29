@@ -8,6 +8,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 if __package__:
     from .test_packet_check import good_inputs, replace_body, replace_line, single_packet
@@ -311,7 +312,19 @@ class SizeCounterTests(unittest.TestCase):
         self.assertEqual(report['left_out']['generated'], {'lines': 0, 'files': 0})
         self.assertTrue(all(row['kind'] == 'counted' for row in self.file_rows(folder)))
 
-    def test_rename_is_added_and_deleted_with_git_path_order(self):
+    # The old add plus delete rule was withdrawn: a move now uses Git's rename counts.
+    # Controls: full add/delete breaks pure moves; dropping all moves breaks edited moves.
+    # Using just 1 path's kind breaks a crossing; counting every move breaks tests to tests.
+    def move_file(self, old_path, new_path, contents):
+        self.write(old_path, ''.join(f'fruit {n}\n' for n in range(12)))
+        self.base = self.commit()
+        target = self.repo / new_path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        (self.repo / old_path).rename(target)
+        if contents is not None:
+            self.write(new_path, contents)
+
+    def test_pure_move_counts_0_and_keeps_both_paths(self):
         self.write('orchard.py', 'fruit\n')
         self.base = self.commit()
         (self.repo / 'orchard.py').rename(self.repo / 'grove.py')
@@ -319,8 +332,88 @@ class SizeCounterTests(unittest.TestCase):
         report = self.count(self.commit(), '--out', folder)
         self.assertEqual([(row['path'], row['status'], row['old_path'])
                           for row in self.file_rows(folder)],
-                         [('grove.py', 'added', ''), ('orchard.py', 'deleted', '')])
-        self.assertEqual(report['counted_total'], 2)
+                         [('grove.py', 'renamed', 'orchard.py')])
+        self.assertEqual(self.file_rows(folder)[0]['counted_lines'], 0)
+        self.assertEqual(self.file_rows(folder)[0]['hunks'], [])
+        self.assertEqual((report['files'], report['added'], report['deleted'],
+                          report['total_lines'], report['counted_total']), (1, 0, 0, 0, 0))
+
+    def test_edited_move_counts_3_and_hunks_match_the_row(self):
+        contents = 'pear\n' + ''.join(f'fruit {n}\n' for n in range(1, 12)) + 'plum\n'
+        self.move_file('app/fruit [1].php', 'app/grove [2].php', contents)
+        folder = self.root / 'packet'
+        report = self.count(self.commit(), '--out', folder)
+        self.assertEqual((report['files'], report['added'], report['deleted'],
+                          report['total_lines'], report['counted_total']), (1, 2, 1, 3, 3))
+        row, = self.file_rows(folder)
+        self.assertEqual((row['path'], row['old_path'], row['status'], row['kind']),
+                         ('app/grove [2].php', 'app/fruit [1].php', 'renamed', 'counted'))
+        self.assertEqual(row['counted_lines'], 3)
+        self.assertEqual(row['hunks'], [{'id': 'f1h1', 'counted_lines': 2},
+                                        {'id': 'f1h2', 'counted_lines': 1}])
+        self.assertEqual(sum(hunk['counted_lines'] for hunk in row['hunks']),
+                         row['counted_lines'])
+
+    def test_move_plus_new_file_counts_only_new_lines(self):
+        # Dropping the whole diff when it has a move loses these 2 new lines.
+        self.move_file('app/fruit.php', 'app/grove.php', None)
+        self.write('app/seed.php', 'seed\nsprout\n')
+        folder = self.root / 'packet'
+        report = self.count(self.commit(), '--out', folder)
+        self.assertEqual((report['files'], report['added'], report['deleted'],
+                          report['counted_total']), (2, 2, 0, 2))
+        self.assertEqual([(row['status'], row['counted_lines'], row['old_path'])
+                          for row in self.file_rows(folder)],
+                         [('renamed', 0, 'app/fruit.php'), ('added', 2, '')])
+
+    def test_move_kind_counts_edits_when_either_path_is_counted(self):
+        contents = 'pear\n' + ''.join(f'fruit {n}\n' for n in range(1, 12)) + 'plum\n'
+        cases = [('app/fruit.php', 'tests/fruit.php', contents, 'counted', 3),
+                 ('tests/seed.php', 'app/seed.php', contents, 'counted', 3),
+                 ('tests/tree.php', 'tests/grove.php', contents, 'test', 0),
+                 ('app/leaf.php', 'tests/leaf.php', None, 'counted', 0)]
+        for old_path, new_path, edited, kind, counted in cases:
+            with self.subTest(old_path=old_path, new_path=new_path):
+                self.move_file(old_path, new_path, edited)
+                folder = self.root / 'packet'
+                report = self.count(self.commit(), '--out', folder)
+                row, = self.file_rows(folder)
+                self.assertEqual((row['path'], row['old_path'], row['status'], row['kind'],
+                                  row['counted_lines']),
+                                 (new_path, old_path, 'renamed', kind, counted))
+                self.assertEqual(report['counted_total'], counted)
+                self.assertEqual(report['left_out']['tests'],
+                                 {'lines': 3, 'files': 1} if kind == 'test'
+                                 else {'lines': 0, 'files': 0})
+
+    def test_rename_records_reject_broken_shapes(self):
+        # The subprocess boundary is mocked because real Git emits only valid records.
+        spec = importlib.util.spec_from_file_location('size_counter', self.script)
+        counter = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(counter)
+        metadata = b':100644 100644 ' + b'a' * 40 + b' ' + b'b' * 40 + b' R090\0'
+        raw = metadata + b'app/fruit.php\0app/grove.php\0'
+        numstat = b'2\t1\t\0app/fruit.php\0app/grove.php\0'
+        with mock.patch.object(counter.subprocess, 'run', side_effect=[
+                subprocess.CompletedProcess([], 0, raw, b''),
+                subprocess.CompletedProcess([], 0, numstat, b'')]):
+            file, = counter.changed_files(self.repo, self.base)
+        self.assertEqual((file['path'], file['old_path'], file['added'], file['deleted']),
+                         ('app/grove.php', 'app/fruit.php', 2, 1))
+        cases = [(metadata + b'app/fruit.php\0', numstat),
+                 (raw[:-1], numstat), (raw, numstat[:-1]),
+                 (raw, b'2\t1\t\0app/fruit.php\0'),
+                 (raw, b'2\t1\t\0\0app/grove.php\0'),
+                 (raw, b'2\t1\t\0app/other.php\0app/grove.php\0'),
+                 (raw, b'x\t1\t\0app/fruit.php\0app/grove.php\0'),
+                 (raw, numstat + numstat), (raw, b'')]
+        for raw_output, numstat_output in cases:
+            with self.subTest(raw=raw_output, numstat=numstat_output):
+                with mock.patch.object(counter.subprocess, 'run', side_effect=[
+                        subprocess.CompletedProcess([], 0, raw_output, b''),
+                        subprocess.CompletedProcess([], 0, numstat_output, b'')]):
+                    with self.assertRaises(counter.GitError):
+                        counter.changed_files(self.repo, self.base)
 
     def test_empty_diff_has_0_totals_and_no_files(self):
         folder = self.root / 'packet'

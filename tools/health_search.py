@@ -15,6 +15,7 @@ def routes(args):
     repo = Path(args.repo).resolve(strict=True)
     if not repo.is_dir():
         raise ValueError('repo must be a directory')
+    pointer_threshold = 10
     controllers = []
     route_files = sorted((repo / 'routes').glob('*.php'))
     for filename in args.files:
@@ -32,10 +33,12 @@ def routes(args):
                     where.append(f'{route_file.relative_to(repo).as_posix()}:{number}')
                     resources += bool(re.search(r'Route::(?:resource|apiResource)\s*\(', line))
         controllers.append(dict(file=filename, **{'class': class_name}, route_lines=len(where),
+                                pointer=len(where) >= pointer_threshold,
                                 resource_lines=resources, where=where,
                                 note='resource lines count as 1; the real route count is higher'
                                 if resources else 'counts route lines'))
-    return outcome('clean', 'counts only, a number is a pointer', controllers=controllers)
+    return outcome('clean', 'counts only, a number is a pointer', controllers=controllers,
+                   pointer_threshold=pointer_threshold)
 
 
 def git(repo, *args):

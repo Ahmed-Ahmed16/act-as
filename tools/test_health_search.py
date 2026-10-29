@@ -1,4 +1,4 @@
-# Cases: route forms, path escape, new copies, old copies, no copies, fixed text.
+# Cases: route forms, 9 and 10 route lines, path escape, new and old copies.
 import json
 import os
 import subprocess
@@ -87,6 +87,25 @@ class HealthSearchTests(unittest.TestCase):
         self.assertIn('higher', card['note'])
         self.assertEqual((acme['route_lines'], acme['resource_lines'], acme['where']),
                          (0, 0, []))
+
+    def test_route_pointer_starts_at_10_lines(self):
+        self.write('app/GlorpController.php', '<?php class GlorpController {}')
+        for count, expected in ((9, False), (10, True)):
+            with self.subTest(route_lines=count):
+                lines = [f"Route::get('zindle{n}', [GlorpController::class, 'floop']);"
+                         for n in range(count - 1)]
+                lines.append("Route::resource('plim', GlorpController::class);")
+                self.write('routes/web.php', '\n'.join(lines))
+                document = self.document('routes', '--repo', self.repo, '--files',
+                                         'app/GlorpController.php')
+                controller = document['controllers'][0]
+                self.assertEqual(controller['route_lines'], count)
+                self.assertIs(controller.get('pointer'), expected)
+                self.assertEqual(document['pointer_threshold'], 10)
+                self.assertEqual(document['result'], 'clean')
+                self.assertEqual(controller['resource_lines'], 1)
+                self.assertEqual(controller['note'],
+                                 'resource lines count as 1; the real route count is higher')
 
     def test_acme_new_lists_and_limits_name_both_paths_with_lines(self):
         for literal in ("['Acme', 'Card']", '5120', 'foo'):

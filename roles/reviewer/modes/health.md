@@ -75,14 +75,15 @@ Before each step, run `cards.py reviewer health <step number>`, for example
    clone count is a floor.
 4. **H2 Long methods and files.** Tool: PHPMD `ExcessiveMethodLength` and
    `ExcessiveClassLength` (1 class, not a whole file) on the changed PHP
-   files, and the line count of each changed file. Thresholds: `___` (Ahmed's
-   call, the spec does not give them). Until they are set, the PHPMD part is
-   `not checked: thresholds not set`. Every number from this step is a
-   pointer (see "Pointers"). Reading: questions 6 and 17.
+   files, and the line count of each changed file. PHPMD runs with its own
+   default limits (method 100 lines, class 1000 lines in PHPMD 3.0.0,
+   `rulesets/codesize.xml`; read in the image 2026-10-27). Do not pass other
+   limits. Every number from this step is a pointer (see "Pointers").
+   Reading: questions 6 and 17.
 5. **H3 One class, many jobs.** Tool: `health_search.py routes` counts the
    route lines per touched controller. The count is a pointer and never a
-   finding. The count that makes a pointer: `___` (Ahmed's call). Until it is
-   set, report the count and write `pointer threshold not set`. The pointer
+   finding. 10 or more route lines on 1 controller make a pointer (the script
+   sets `pointer`); 9 or fewer do not. The pointer
    sends you to questions 11 and 13 (until the question 12 card can load; then
    12 and 13). A `Route::resource` line counts as 1 line but is many routes;
    say so. Reading: questions 11, 12 and 13.
@@ -102,6 +103,17 @@ Before each step, run `cards.py reviewer health <step number>`, for example
    scripts. A name or route hit is a candidate: trace the call and read the
    assertion before you write "covered". When nothing covers a risky area, this
    check is its own finding: "no test found by name, route or caller".
+
+   **Risky areas in a health only run (O13, used by H6 and the independent check).**
+   With no business step, read the changed files for the 3 fixed kinds only:
+   money, logins, deleting data. Run `python tools/risky_areas.py --repo
+   <checkout> --files <changed files>`. Each area it lists is a candidate:
+   open the file and read whether the line really touches that kind. Drop a
+   hit you read and rejected, and say so. These areas feed H6 (find tests for
+   each) and the picks in step 15. A plain change gives none: write "risky
+   areas: none found in the changed files". Not checked always holds
+   "business risky areas: not asked: health run only". Never write the tool's
+   list as a finding by itself.
 9. **H7 Old tests edited or deleted.** Tool: `git diff -M --name-status
    <comparison base> <head>`. Judge each deleted or changed test by lost
    protection: does it still fail when the code breaks? A reason in the PR text
@@ -113,7 +125,9 @@ Before each step, run `cards.py reviewer health <step number>`, for example
     code nobody calls).
 11. **H9 Bugs.** Tool: PHPStan with Larastan at level 5, classified by
     `health_parse.py phpstan`. A line saying an ignored pattern "was not
-    matched" is a stale baseline entry, not a bug; report the count. Reading:
+    matched" is a stale baseline entry, not a bug; report the count. A run
+    whose only issues are stale baseline entries is `clean`, with that count.
+    Reading:
     open every error and confirm it. A bug the PR adds, once confirmed, is
     `must fix` whichever tool found it. A bug already there is a `lead`.
 12. **H10 Cost to add.** No tool. Propose 1 realistic small feature in the
@@ -220,8 +234,8 @@ Before each step, run `cards.py reviewer health <step number>`, for example
     what), 21 (a refactor mixed into a feature PR). Ask question 31 (a refactor
     needs a record of old behaviour and proof) when the PR is a refactor or
     cleanup. Ask question 32 (docs updated when behaviour or setup changed)
-    when the `docs-guard` trigger fires; whether it also fires for new
-    behaviour no doc mentions yet: `___`. Question 12 (one actor per class)
+    when the `docs-guard` trigger fires, and also when the PR adds behaviour
+    that no document mentions. Question 12 (one actor per class)
     joins only when its card loads from `cards.py`; if it does not load, do not
     ask it. Questions 14 and 19 are not asked in v1 (open). Questions 24 to 29
     belong to size and the packet; question 30 belongs to security. A design

@@ -9,7 +9,8 @@ from pathlib import Path
 
 
 class BusinessPagesTests(unittest.TestCase):
-    # Boundaries: missing and misplaced Covers; exact and nested paths;
+    # Boundaries: Covers on lines 1 through 6; first Covers wins; patterns;
+    # exact and nested paths;
     # 0, 1 and repeated statuses; old and new rename paths; absent drafts.
     def setUp(self):
         self.tree = tempfile.TemporaryDirectory(prefix='zindle-')
@@ -72,6 +73,9 @@ class BusinessPagesTests(unittest.TestCase):
             'glorp': 'Glorp\nCovers: app/Loans/\n',
             'snorf': '# Snorf\nR1. **match**\n',
             'twib': 'Covers: app/Untouched/\n',
+            'blim': '# Blim\n\nGlorp\nCovers: app/Loans/\n',
+            'flim': '# Flim\n\nGlorp\nPlim\nCovers: app/Loans/\n',
+            'grib': '# Grib\n\nGlorp\nPlim\nFloop\nCovers: app/Loans/\n',
         }
         for area, contents in pages.items():
             self.page(area, contents)
@@ -79,13 +83,62 @@ class BusinessPagesTests(unittest.TestCase):
         self.write('app/Loans/LoanPolicy.php', 'zindle\n')
         report = self.packet(self.commit())
         self.assertEqual(report['files'], [dict(path='app/Loans/LoanPolicy.php',
-                         old_path=None, status='A', areas=['floop', 'zindle'])])
-        self.assertEqual(report['pages_without_covers'], ['glorp', 'plim', 'snorf'])
-        self.assertEqual([area['area'] for area in report['areas']], ['floop', 'zindle'])
-        self.assertEqual(report['areas'][1]['covers'], ['app/Loans/', 'app/Vault.php'])
+                         old_path=None, status='A',
+                         areas=['blim', 'flim', 'floop', 'glorp', 'plim', 'zindle'])])
+        self.assertEqual(report['pages_without_covers'], ['grib', 'snorf'])
+        areas = {area['area']: area for area in report['areas']}
+        self.assertEqual(areas['zindle']['covers'], ['app/Loans/', 'app/Vault.php'])
+        self.assertEqual(areas['plim']['covers'], ['app/Loans/'])
         self.assertTrue(report['areas'][0]['covers_ok'])
-        self.assertEqual(report['areas'][1]['checked_at'], 'glorp')
+        self.assertEqual(areas['zindle']['checked_at'], 'glorp')
         self.assertIsNone(report['areas'][0]['checked_at'])
+        self.assertFalse(areas['plim']['area_incomplete'])
+
+    def test_first_covers_line_wins(self):
+        self.page('zindle', '# Zindle\n\nCovers: src/Glorp.php\nCovers: src/Plim.php\n')
+        self.default = self.base = self.commit()
+        for path in ('src/Glorp.php', 'src/Plim.php'):
+            self.write(path, 'floop\n')
+        report = self.packet(self.commit())
+        self.assertEqual(report['areas'][0]['covers'], ['src/Glorp.php'])
+        self.assertEqual(report['areas'][0]['files'], ['src/Glorp.php'])
+        self.assertEqual(report['no_area_found'], [dict(path='src/Plim.php', old_path=None)])
+
+    def test_covers_patterns_are_reported_and_plain_entries_still_map(self):
+        patterns = ['src/}glorp.php', 'src/{glorp.php', 'src/]glorp.php',
+                    'src/[glorp.php', 'src/?.php', 'src/*.php']
+        self.page('zindle', 'Covers: ' + ', '.join(patterns + ['src/Plim.php', 'lib/']) + '\n')
+        self.default = self.base = self.commit()
+        for path in ('src/Glorp.php', 'src/Plim.php', 'lib/Floop.php'):
+            self.write(path, 'floop\n')
+        report = self.packet(self.commit())
+        area = report['areas'][0]
+        self.assertEqual(area['covers'], ['lib/', 'src/Plim.php'])
+        self.assertEqual(area['covers_patterns'], sorted(patterns))
+        self.assertEqual(area['not_checked'], ['Covers entry is a pattern'])
+        self.assertTrue(area['covers_ok'])
+        self.assertTrue(area['area_incomplete'])
+        self.assertEqual(area['files'], ['lib/Floop.php', 'src/Plim.php'])
+        self.assertEqual(report['no_area_found'], [dict(path='src/Glorp.php', old_path=None)])
+
+    def test_pattern_only_page_keeps_its_explanation_in_the_packet(self):
+        # G33: rejected patterns must survive even without a mapped file.
+        self.page('zindle', 'Covers: app/*.php\n')
+        self.default = self.base = self.commit()
+        self.write('app/Glorp.php', 'floop\n')
+        report = self.packet(self.commit())
+        self.assertEqual(report['areas'], [])
+        self.assertEqual(report['no_area_found'], [dict(path='app/Glorp.php', old_path=None)])
+        self.assertEqual(len(report.get('pages_with_patterns', [])), 1)
+        page = report['pages_with_patterns'][0]
+        self.assertEqual(page['area'], 'zindle')
+        self.assertEqual(page['page'], 'docs/business-rules/zindle.md')
+        self.assertEqual(page['covers_patterns'], ['app/*.php'])
+        self.assertEqual(page['not_checked'], ['Covers entry is a pattern'])
+        self.assertTrue(page['area_incomplete'])
+        self.assertEqual(page['files'], [])
+        manifest = json.loads((self.out / 'rules-pages.json').read_text(encoding='utf-8'))
+        self.assertEqual(manifest['areas'], [])
 
     def test_path_boundaries_and_overlapping_pages(self):
         self.page('zindle', 'Covers: app/Loans, docs/, app/Vault.php\n')
@@ -143,6 +196,7 @@ class BusinessPagesTests(unittest.TestCase):
                          page=str(self.drafts / 'floop.md'),
                          commit='sha256:' + hashlib.sha256(draft_bytes).hexdigest(),
                          checked_at=None, covers=['app/Vault/'], covers_ok=True,
+                         covers_patterns=[], not_checked=[], area_incomplete=False,
                          draft_also_exists=False, rules=[dict(id='R21', status='owner')],
                          files=['app/Vault/VaultPolicy.php']))
         self.assertEqual(default['source'], 'default')
@@ -161,7 +215,7 @@ class BusinessPagesTests(unittest.TestCase):
 
     def test_status_words_are_counted_without_glossary_words(self):
         self.page('zindle', 'Covers: app/Loans/\nChecked at: floop\nChecked at: plim\n'
-                  'R31. **MATCH** **glorp**\nR32. **gap** **owner**\n'
+                  'R31. **MATCH** **glorp**\nR32. **match** **gap**\n'
                   'R33. **open** **open**\nR34. **glorp**\nR35. plim\n'
                   'R36. **gap**\nR37. **owner**\nR38. **open**\n R39. **match**\n')
         self.default = self.base = self.commit()
@@ -171,6 +225,10 @@ class BusinessPagesTests(unittest.TestCase):
         self.assertEqual(area['rules'], [dict(id=rule_id, status=status) for rule_id, status in zip(
                          ['R31', 'R32', 'R33', 'R34', 'R35', 'R36', 'R37', 'R38'],
                          ['match', 'multiple', 'multiple', 'none', 'none', 'gap', 'owner', 'open'])])
+        self.assertEqual(area['not_checked'], ['rule R32 has 2 statuses',
+                         'rule R33 has 2 statuses', 'rule R34 has no status',
+                         'rule R35 has no status'])
+        self.assertTrue(area['area_incomplete'])
 
     def test_selected_area_rerun_preserves_other_saved_draft(self):
         # G17: another area's changed draft must not replace its reviewed copy.

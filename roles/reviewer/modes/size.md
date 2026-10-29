@@ -23,6 +23,7 @@ Before each step, run `cards.py reviewer size <step number>`, for example
    cannot be checked, the base is not proved: write
    `not checked: PR already merged, base not proved` as the size line,
    stop, and make no count.
+   Comparison base and head cards: `REV-114` to `REV-118`.
 2. **Packet folder and first snapshot.** Make the packet folder outside the
    checkout (ROLE.md section 5). Save the checkout snapshot into its `runs/`
    folder: `python <snapshot tool> save <checkout> runs/snapshot-start.txt`.
@@ -36,12 +37,13 @@ Before each step, run `cards.py reviewer size <step number>`, for example
    `not checked: count failed, <the stderr line>`, never a pass. Exit 3
    means the base is not proved: use the step 1 words. Copy the counter's
    JSON output into `runs/size-count.json`.
+   Counting cards: `REV-101` to `REV-107`.
 4. **Decide.** 300 counted lines or fewer is `pass`. 301 or more is `fail`
    with no margin. The size line is
    `size: <pass or fail>, <n> counted lines, cap 300; left out: tests <n> (<k> files), lock files <n> (<k> files), generated <n> (<k> files), docs <n> (<k> files)`.
    Only the words "review it anyway" from the user lift the cap, and a size
    mode run has nothing to lift. A fail is written as the over the cap
-   packet in step 5.
+   packet in step 5. Size line and over the cap cards: `REV-108`, `REV-109`.
 5. **Write the packet.** (Over the cap: use the changes at the end of this
    step.) File `packet.md` in the packet folder, in the
    packet format the packet check reads. Identity line with `mode=size`. The
@@ -59,6 +61,8 @@ Before each step, run `cards.py reviewer size <step number>`, for example
    `{"required_ids": [], "entries": []}`; `split-plan.json`:
    `{"groups": [], "first_group_parts": [], "unplaced": []}`;
    `rules-pages.json`: `{"areas": []}`.
+   Reading and identity line cards: `REV-110` to `REV-113`, `REV-119`,
+   `REV-120`.
 
    **Over the cap (size line is `fail`).** Same file, same fields, with these
    changes only. The size line is the step 4 fail line with its counts. The
