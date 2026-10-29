@@ -25,7 +25,7 @@ HEAD = 'a' * 40
 
 
 def good_packet():
-    bodies = ['The cart shows ___ (tax) after a country change.',
+    bodies = ['The cart shows ___ (tax) after a country change.\nno translation files changed',
               'cart.py reads the country.', f'CI run 12 on {HEAD}: pass',
               '___ (tax): The owner has not supplied the tax rule.',
               'none', 'none', 'not needed: The change fits together.',
@@ -36,7 +36,7 @@ def good_packet():
             'size: pass, 120 counted lines\n'
             'business: incomplete, no rules page; merge only after: owner answers\n'
             'security: pass\nhealth: fail, 1 must fix\n'
-            f'money: {MONEY_NO}\n\n' + ''.join(
+            f'money: {MONEY_NO}\nLaravel: project 11.54.0, card docs 12.x\n\n' + ''.join(
                 f'## {heading}\n{body}\n\n' for heading, body in zip(HEADINGS, bodies)))
 
 
@@ -69,6 +69,11 @@ def good_inputs():
     for entry in entries[-2:]:
         entry.update(mode='business', area='orchard', kind='rule',
                      base_read='baseline: none, new feature', head_read='Read orchard.py.')
+    entries[-2:-2] = [dict(id=key, mode='health', area='', kind='check',
+                          tool_result='Ran the orchard check.', reading_result='Read orchard.py.',
+                          word='none', reason='', base_read='', head_read='')
+                      for key in [*(f'H{n}' for n in range(1, 12)),
+                                  *(f'T{n}' for n in range(1, 9))]]
     return {
         'check-record.json': {'required_ids': ['RA', 'RB'], 'entries': entries},
         'files.json': {'files': [dict(path='orchard.py', old_path='', status='added',
@@ -126,7 +131,17 @@ class PacketCheckTests(unittest.TestCase):
                             'Translations by page: ' + STOP)
 
     def override_packet(self):
-        return CAP_LINE + '\n' + replace_line(good_packet(), 'size', 'fail, 120 counted lines')
+        file = self.inputs['files.json']['files'][0]
+        file.update(counted_lines=301, hunks=[{'id': 'h1', 'counted_lines': 181},
+                                             {'id': 'h2', 'counted_lines': 120}])
+        self.inputs['split-plan.json']['groups'] = [
+            dict(name='orchard', entry_points=['orchard.py'], estimate=181, hunks=['h1']),
+            dict(name='grove', entry_points=['grove.py'], estimate=120, hunks=['h2'])]
+        self.write_inputs()
+        groups = 'group: orchard, 181 counted lines\ngroup: grove, 120 counted lines'
+        packet = replace_line(good_packet(), 'size', 'fail, 301 counted lines')
+        packet = replace_body(packet, 'Split plan', groups)
+        return CAP_LINE + '\n' + replace_body(packet, 'Drafts, not sent', groups)
 
     def rerun_packet(self):
         packet = replace_line(good_packet(), 'business', 'pass, orchard rebuilt')
@@ -341,10 +356,11 @@ class PacketCheckTests(unittest.TestCase):
         self.assert_rules(packet, 'full-split-plan')
 
     def test_override_cap_line_missing_cross_size_fail(self):
-        self.assert_rules(self.override_packet().replace(CAP_LINE + '\n', ''), 'cross-size-fail')
+        self.assert_rules(self.override_packet().replace(CAP_LINE + '\n', ''),
+                          'cross-size-fail', 'full-split-plan')
 
     def test_override_size_not_fail(self):
-        self.assert_rules(CAP_LINE + '\n' + good_packet(), 'override-size-fail')
+        self.assert_rules(CAP_LINE + '\n' + good_packet(), 'override-size-fail', 'override-split-plan')
 
     def test_override_size_counts_missing(self):
         self.assert_rules(replace_line(self.override_packet(), 'size', 'fail'), 'full-size-counts')
@@ -541,8 +557,245 @@ class PacketCheckTests(unittest.TestCase):
     def test_full_packet_passes(self):
         self.assert_pass(good_packet())
 
-    def test_override_packet_passes(self):
+    # Cases: real override, missing plans, exact counts and order, cap text anywhere.
+    # Removing a new rule must fail its named case. Existing checks stay as guards.
+    def test_T1_F1(self):
         self.assert_pass(self.override_packet())
+
+    def test_T1_F2(self):
+        self.assert_rules(replace_body(self.override_packet(), 'Split plan', 'not needed: x'),
+                          'override-split-plan', 'split-field')
+
+    def test_T1_F3(self):
+        self.assert_rules(replace_body(self.override_packet(), 'Drafts, not sent', 'Draft: Split it.'),
+                          'split-message')
+
+    def test_T1_F4_F5b(self):
+        packet = self.override_packet()
+        for row, body in [('F4', 'group: orchard, 180 counted lines\ngroup: grove, 120 counted lines'),
+                          ('F5b', 'group: grove, 120 counted lines\ngroup: orchard, 181 counted lines')]:
+            with self.subTest(row=row):
+                self.assert_rules(replace_body(packet, 'Split plan', body), 'split-field')
+
+    def test_T1_F5(self):
+        packet = self.override_packet()
+        self.inputs['split-plan.json']['groups'][1]['hunks'] = []
+        self.write_inputs()
+        self.assert_rule(packet, 'hunk-unplaced', 'unplaced hunks: h2',
+                         'RULE split-field: group lines differ from split-plan.json',
+                         'RULE split-message: group lines differ from split-plan.json')
+
+    def test_T1_F5c(self):
+        packet = self.override_packet()
+        self.inputs['split-plan.json']['groups'][1]['hunks'].append('h1')
+        self.write_inputs()
+        self.assert_rule(packet, 'hunk-duplicate', 'duplicate hunks: h1',
+                         'RULE split-field: group lines differ from split-plan.json',
+                         'RULE split-message: group lines differ from split-plan.json')
+
+    def test_T1_F5d(self):
+        packet = self.override_packet()
+        self.inputs['files.json']['files'][0]['hunks'][0]['counted_lines'] = 180
+        self.write_inputs()
+        self.assert_rules(packet, 'hunk-counts', 'split-field', 'split-message')
+
+    def test_T1_F6(self):
+        packet = self.override_packet().replace(CAP_LINE + '\n', '')
+        self.inputs['files.json'] = good_inputs()['files.json']
+        self.write_inputs()
+        packet = packet.replace('orchard, 181', 'orchard, 70').replace('grove, 120', 'grove, 50')
+        self.assert_rules(replace_line(packet, 'size', 'pass, 120 counted lines'), 'full-split-plan')
+
+    def test_T1_F7(self):
+        self.assert_rules(self.override_packet() + 'It was not reviewed past size\n', 'cap-contradiction')
+
+    def test_T1_F7b(self):
+        self.assert_rules(replace_line(self.override_packet(), 'money', STOP), 'override-not-checked')
+
+    def test_T1_F7c(self):
+        self.assert_rules(replace_body(self.override_packet(), 'Tests run', STOP),
+                          'override-not-checked', 'full-tests-run', 'tests-ci-form')
+
+    def test_T1_missing_override_groups(self):
+        packet = self.override_packet()
+        self.inputs['split-plan.json']['groups'] = []
+        self.inputs['split-plan.json']['unplaced'] = ['h1', 'h2']
+        self.write_inputs()
+        packet = replace_body(packet, 'Split plan', 'Split orchard from grove.')
+        self.assert_rules(replace_body(packet, 'Drafts, not sent', 'Draft: Split it.'),
+                          'override-split-plan')
+
+    def test_T1_cap_stop_anywhere_once(self):
+        for cap in [False, True]:
+            packet = self.override_packet() if cap else good_packet()
+            for heading in HEADINGS[3:6]:
+                with self.subTest(cap=CAP_LINE in packet, heading=heading):
+                    body = STOP + '\n' + STOP
+                    if heading == 'Not checked':
+                        body += '\n___ (tax): Missing rule.'
+                    self.assert_rules(replace_body(packet, heading, body),
+                                      'override-not-checked')
+            self.inputs = good_inputs()
+            self.write_inputs()
+
+    # Cases: absent ids, wrong mode, short packets, and single health mode.
+    def test_T2_F8_F9_F9b(self):
+        for row, key, wrong_mode in [('F8', 'H5', False), ('F9', 'T8', False),
+                                     ('F9b', 'H5', True)]:
+            with self.subTest(row=row):
+                self.inputs = good_inputs()
+                entries = self.inputs['check-record.json']['entries']
+                if wrong_mode:
+                    next(entry for entry in entries if entry['id'] == key)['mode'] = 'security'
+                else:
+                    entries[:] = [entry for entry in entries if entry['id'] != key]
+                self.write_inputs()
+                self.assert_rule(good_packet(), 'full-health-ids', 'missing health ids: ' + key)
+
+    def test_T2_F10(self):
+        packet = self.short_packet()
+        self.inputs['check-record.json'].update(required_ids=[], entries=[
+            entry for entry in self.inputs['check-record.json']['entries']
+            if entry['mode'] == 'security'])
+        self.inputs['rules-pages.json']['areas'] = []
+        self.write_inputs()
+        self.assert_pass(packet)
+
+    def test_T2_F11(self):
+        self.inputs['check-record.json']['entries'] = self.inputs['check-record.json']['entries'][-2:]
+        self.write_inputs()
+        self.assert_pass(single_packet('health'))
+
+    # Cases: absent, 1, duplicate, wrong section, comma, empty, and missing docs.
+    def test_T3_F12_F16_F17_F18(self):
+        line = 'Laravel: project 11.54.0, card docs 12.x'
+        for row, replacement in [('F12', ''), ('F16', line + '\nLaravel: broken'),
+                                  ('F17', ''), ('F18', 'Laravel: project 11.54.0'),
+                                  ('comma', 'Laravel: project 11, extra, card docs 12.x'),
+                                  ('empty', 'Laravel: project , card docs 12.x')]:
+            with self.subTest(row=row):
+                packet = good_packet().replace(line, replacement)
+                if row == 'F17':
+                    packet += line + '\n'
+                self.assert_rules(packet, 'full-laravel-line')
+
+    def test_T3_F13_F14_F15(self):
+        for row, project in [('F13', '11.54.0'),
+                             ('F14', '^11.0'), ('F15', '___ (laravel version)')]:
+            with self.subTest(row=row):
+                line = f'Laravel: project {project}, card docs 12.x'
+                if row == 'F14':
+                    line += ', from the constraint, not the lock'
+                packet = replace_line(good_packet(), 'Laravel', line[len('Laravel: '):])
+                if row == 'F15':
+                    packet = replace_body(packet, 'Not checked',
+                                          '___ (tax): Missing rule.\n'
+                                          '___ (laravel version): composer.json is not readable')
+                self.assert_pass(packet)
+
+    # Cases: absent translation line, both accepted forms, and cap stop text.
+    def test_T4_F19_F21(self):
+        for row, body, rules in [('F19', 'The cart changed.', ['full-translations']),
+                                 ('F21', 'Translations by page: ' + STOP,
+                                  ['full-translations', 'override-not-checked'])]:
+            with self.subTest(row=row):
+                self.assert_rules(replace_body(good_packet(), 'Behaviour changed', body), *rules)
+
+    def test_T4_F20(self):
+        for body in ['Translations by page: lang/xx.json 2 keys', 'no translation files changed']:
+            with self.subTest(body=body):
+                self.assert_pass(replace_body(good_packet(), 'Behaviour changed', body))
+
+    def test_T4_F22(self):
+        self.assert_pass(self.short_packet())
+
+    # Cases: touches with none, finding, must fix, missing fold, wrong verdict or mode.
+    def test_T8_F23_F24_F25_F26_F27_F27b_F27c(self):
+        cases = [('F23', 'must fix', 'touches: access', None, 'full', 'pass', ['fold-missing']),
+                 ('F24', 'must fix', 'touches: access', 'must fix', 'full', 'fail', []),
+                 ('F25', 'must fix', 'touches: access', 'must fix', 'full', 'pass', ['security-line']),
+                 ('F26', 'finding', 'touches: money', 'finding', 'full', 'pass', []),
+                 ('F27', 'finding', 'Read the orchard.', None, 'full', 'pass', []),
+                 ('F27b', 'none', 'touches: access', None, 'full', 'pass', []),
+                 ('F27c', 'must fix', 'touches: access', None, 'health', 'pass', [])]
+        for row, word, reason, fold, mode, security, rules in cases:
+            with self.subTest(row=row):
+                self.inputs = good_inputs()
+                health_id = 'L3' if row == 'F27' else 'L2'
+                entry = dict(id=health_id, mode='health', kind='check', area='',
+                             tool_result='Ran orchard.', reading_result='Read orchard.py.',
+                             word=word, reason=reason, base_read='', head_read='')
+                self.inputs['check-record.json']['entries'].append(entry)
+                if fold:
+                    self.inputs['check-record.json']['entries'].append(
+                        dict(entry, id='F-' + health_id, mode='security', word=fold))
+                self.write_inputs()
+                packet = (replace_line(good_packet(), 'security', security) if mode == 'full'
+                          else single_packet('health'))
+                if rules:
+                    self.assert_rule(packet, rules[0],
+                                     'missing security folds: L2' if row == 'F23'
+                                     else 'security must fix requires fail')
+                else:
+                    self.assert_pass(packet)
+
+    # Cases: each CI state, wrong head, missing file, empty pages, bad shapes and case.
+    def test_T9_C1_C2_C3_C4_C5_C9(self):
+        for mode in ['full', 'health']:
+            for row, body, rules in [
+                    ('C1', f'CI run 7 on {HEAD}: pending', []),
+                    ('C2', f'CI run 7 on {HEAD}: cancelled', []),
+                    ('C3', f'CI run 7 on {HEAD}: pass\nCI run 8 on {HEAD}: cancelled', []),
+                    ('C4', f'CI run 7 on {HEAD}: mixed', []),
+                    ('C5', f'CI run 7 on {HEAD}: unknown', ['tests-ci-form']),
+                    ('C9', f'CI run 7 on {"b" * 40}: pass',
+                     ['full-tests-run' if mode == 'full' else 'single-tests-run'])]:
+                with self.subTest(row=row, mode=mode):
+                    packet = good_packet() if mode == 'full' else single_packet(mode)
+                    packet = replace_body(packet, 'Tests run', body)
+                    if rules:
+                        self.assert_rules(packet, *rules)
+                    else:
+                        self.assert_pass(packet)
+
+    def test_T9_C6_C7_C8_C11(self):
+        runs = self.packet / 'runs'
+        runs.mkdir()
+        path = runs / 'ci-runs.json'
+        for mode in ['full', 'health']:
+            for row, document, rules in [
+                    ('C6', [{'workflow_runs': [{'head_sha': HEAD.upper()}]}], ['tests-no-ci-false']),
+                    ('C6_object', {'workflow_runs': [{'head_sha': HEAD}]}, ['tests-no-ci-false']),
+                    ('C7', [{'workflow_runs': []}, {'workflow_runs': []}], []),
+                    ('C7_empty', [], []),
+                    ('C8', [{'workflow_runs': [{'head_sha': 'b' * 40}]}], []),
+                    ('C11', None, [])]:
+                with self.subTest(row=row, mode=mode):
+                    if document is None:
+                        path.unlink()
+                    else:
+                        path.write_text(json.dumps(document), encoding='utf-8')
+                    packet = good_packet() if mode == 'full' else single_packet(mode)
+                    packet = replace_body(packet, 'Tests run', 'not checked: no CI run on head ' + HEAD)
+                    if rules:
+                        self.assert_rules(packet, *rules)
+                    else:
+                        self.assert_pass(packet)
+
+    def test_T9_C10(self):
+        runs = self.packet / 'runs'
+        runs.mkdir()
+        for contents in ['{', 'null', '7', '{}', '[[]]', '{"workflow_runs": {}}',
+                         '{"workflow_runs": [null]}', '{"workflow_runs": [{}]}',
+                         '{"workflow_runs": [{"head_sha": 7}]}']:
+            with self.subTest(contents=contents):
+                (runs / 'ci-runs.json').write_text(contents, encoding='utf-8')
+                run = self.check_text(good_packet())
+                self.assertEqual(run.returncode, 2, run.stdout + run.stderr)
+                self.assertEqual(run.stdout, '')
+                self.assertEqual(len(run.stderr.splitlines()), 1, run.stderr)
+                self.assertTrue(run.stderr.startswith('packet_check: '), run.stderr)
+                self.assertIn('runs/ci-runs.json', run.stderr)
 
     def test_headings_missing_duplicate_or_out_of_order(self):
         packet = good_packet()
@@ -613,13 +866,17 @@ class PacketCheckTests(unittest.TestCase):
                          'unknown\nnot checked:']:
                 with self.subTest(heading=heading, body=body):
                     packet = good_packet().replace('___ (tax)', 'tax pending')
+                    extra = (['RULE full-translations: Behaviour changed needs translations by page '
+                              'or no translation changes'] if heading == 'Behaviour changed' else [])
                     self.assert_rule(replace_body(packet, heading, body),
-                                     'missing-part', 'missing content: ' + heading)
+                                     'missing-part', 'missing content: ' + heading, *extra)
         for heading in [*HEADINGS[:3], *HEADINGS[4:]]:
             with self.subTest(heading=heading, body=''):
                 packet = good_packet().replace('___ (tax)', 'tax pending')
+                extra = (['RULE full-translations: Behaviour changed needs translations by page '
+                          'or no translation changes'] if heading == 'Behaviour changed' else [])
                 self.assert_rule(replace_body(packet, heading, ''),
-                                 'missing-part', 'missing content: ' + heading)
+                                 'missing-part', 'missing content: ' + heading, *extra)
 
     def test_missing_part_allows_none_in_risks_and_pointers(self):
         for heading in HEADINGS[4:6]:
@@ -694,6 +951,8 @@ class PacketCheckTests(unittest.TestCase):
     def test_cap_contradiction_rejects_both_statements(self):
         self.assert_rule(self.override_packet() + 'It was not reviewed past size\n',
                          'cap-contradiction', 'cap review contradicts size stop')
+        self.inputs = good_inputs()
+        self.write_inputs()
         self.assert_pass(good_packet() + 'It was not reviewed past size\n')
 
     def test_multiple_rules_each_print_once_in_rule_order(self):

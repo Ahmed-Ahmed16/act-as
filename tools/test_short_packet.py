@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 STOP = 'not checked: PR over the cap, split it first'
 
 
-class ShortPacketTests(unittest.TestCase):
+class ShortPacketBase(unittest.TestCase):
     # Cases: 301, larger, stale bytes/commits, absent/invalid input,
     # existing outputs, rename, binary, and a dropped or reordered group.
     def setUp(self):
@@ -110,6 +110,17 @@ class ShortPacketTests(unittest.TestCase):
             (self.packet / 'packet.md').write_bytes(text.encode())
         return self.run_tool('packet_check.py', self.packet)
 
+    def assert_bad_writer(self):
+        before = {p.relative_to(self.packet): p.read_bytes() for p in self.packet.rglob('*') if p.is_file()}
+        run = self.writer()
+        self.assertEqual((run.returncode, run.stdout), (2, ''), run.stdout + run.stderr)
+        self.assertEqual(len(run.stderr.splitlines()), 1, run.stderr)
+        after = {p.relative_to(self.packet): p.read_bytes() for p in self.packet.rglob('*') if p.is_file()}
+        self.assertEqual(before, after)
+        return run
+
+
+class ShortPacketTests(ShortPacketBase):
     def test_B1_count_build_write_and_check_including_301(self):
         for total in [321, 301]:
             with self.subTest(total=total):
@@ -146,15 +157,6 @@ class ShortPacketTests(unittest.TestCase):
                     self.assertEqual((run.returncode, run.stderr), (1, ''))
                     self.assertIn('RULE ' + rule + ':', run.stdout)
 
-    def assert_bad_writer(self):
-        before = {p.relative_to(self.packet): p.read_bytes() for p in self.packet.rglob('*') if p.is_file()}
-        run = self.writer()
-        self.assertEqual((run.returncode, run.stdout), (2, ''), run.stdout + run.stderr)
-        self.assertEqual(len(run.stderr.splitlines()), 1, run.stderr)
-        after = {p.relative_to(self.packet): p.read_bytes() for p in self.packet.rglob('*') if p.is_file()}
-        self.assertEqual(before, after)
-        return run
-
     def test_B19_edited_input_refuses_without_writes(self):
         self.prepare()
         path = self.packet / 'split-input.json'
@@ -187,16 +189,18 @@ class ShortPacketTests(unittest.TestCase):
                                          reason=STOP, base_read='', head_read=''))
         self.assertEqual(self.read('rules-pages.json'), dict(areas=[]))
 
-    def test_B23_role_keeps_scaffold_and_lists_split_steps(self):
+    def test_B23_role_keeps_split_steps_without_scaffold(self):
         text = (ROOT / 'roles/reviewer/modes/full.md').read_text(encoding='utf-8')
-        self.assertIn('1. **Scaffold.** Filled by ticket 39. Until then this mode does nothing but\n   open.', text)
+        self.assertIn('1. **Freeze, folder and size.**', text)
+        self.assertNotIn('scaffold', text.lower())
+        self.assertNotIn('Filled by ticket 39', text)
+        text = text[text.index('2. **Split step.**'):].split('\n3. ', 1)[0]
         self.assertIn('2. **Split step.**', text)
         for letter in 'abcdefghij':
             self.assertIn('   ' + letter + '. ', text)
         for token in ['cards.py reviewer full 2', 'hunks', 'build', 'short_packet.py', 'packet_check.py',
                       'Translations by page: ' + STOP]:
             self.assertIn(token, text)
-        self.assertNotIn('safe to merge', text)
 
     def test_B25_rename_and_binary_operations_pass_the_checker(self):
         self.prepare(operations=True)
