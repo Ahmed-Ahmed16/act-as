@@ -1,6 +1,6 @@
 # Roadmap
 
-What is done, what is next, and what is still untested. Updated 2026-10-27.
+What is done, what is next, and what is still untested. Updated 2026-10-28.
 
 ## Done: v1, the tester role
 
@@ -68,6 +68,9 @@ What is done, what is next, and what is still untested. Updated 2026-10-27.
    - Scripts in `tools/`, each with unit tests: the size counter, the packet
      check, the translation key set script, the security scan, the business
      rules page reader, the health scripts and the leak check.
+   - `tools/split_plan.py hunks` binds hunk hashes to the saved full commits.
+     It writes no source text. The packet check counts pieces such as
+     `f1h1:L1-L4` and rejects gaps, overlaps and bad ranges.
    - 11 policy cards (REV-P01 to REV-P11) and 199 source cards (REV-101 to
      REV-613), all approved by the user. `cards.py reviewer --audit` shows 0
      skipped, and CI runs it beside the tester audit.

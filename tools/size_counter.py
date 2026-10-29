@@ -169,12 +169,16 @@ def count_files(files, head_blobs, base_blobs):
     return report, rows
 
 
-def file_hunks(repo, comparison, row, file_index):
+def hunk_patch(repo, comparison, row):
     # A literal path keeps names such as fruit [1].py from matching other files.
     paths = [row['old_path'], row['path']] if row['old_path'] else [row['path']]
-    patch = git_bytes(repo, 'diff', '--no-color', '--no-ext-diff', '-M',
+    return git_bytes(repo, 'diff', '--no-color', '--no-ext-diff', '-M',
                       '--inter-hunk-context=0', '-U0', comparison,
                       '--', *(':(literal)' + path for path in paths))
+
+
+def file_hunks(repo, comparison, row, file_index):
+    patch = hunk_patch(repo, comparison, row)
     hunks = []
     for number, header in enumerate(HUNK_HEADER.finditer(patch), 1):
         deleted, added = header.groups()
