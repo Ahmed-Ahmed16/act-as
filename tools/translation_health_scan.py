@@ -157,7 +157,38 @@ def blade_sources(text):
     # Remove extracted bodies so normal Blade text is never counted twice.
     for start, end in reversed(spans):
         text = text[:start] + re.sub(r'[^\n]', ' ', text[start:end]) + text[end:]
-    return [(text, 0), *sources]
+    return [*blade_code_sources(text), *sources]
+
+
+def blade_code_sources(text):
+    # Cases: nested directives, PHP blocks, bound attributes, apostrophes in HTML.
+    main = list(re.sub(r'[^\n]', ' ', text))
+    sources, covered = [], 0
+    regions = (r'@\w+\s*\(|@php\b|<\?(?:php\b|=)|'
+               r'''(?<![\w:]):[\w.-]+\s*=\s*(?:"((?:\\.|[^"\\])*)"|'((?:\\.|[^'\\])*)')''')
+    for match in re.finditer(regions, text, re.S):
+        start, end = match.span()
+        if start < covered:
+            continue
+        if match.lastindex:
+            group = 1 if match.group(1) is not None else 2
+            sources.append((match.group(group), match.start(group)))
+        else:
+            if match.group().endswith('('):
+                tokens = [(token.group(), token.start()) for token in TOKEN.finditer(text, start)]
+                _, closing = arguments(tokens, 2)
+                if closing == 2:
+                    continue
+                end = tokens[closing][1] + 1
+            else:
+                closing = '@endphp' if match.group().startswith('@php') else '?>'
+                end = next((token.start() + len(closing) for token in TOKEN.finditer(text, end)
+                            if text.startswith(closing, token.start())), None)
+                if end is None:
+                    continue
+            main[start:end] = text[start:end]
+        covered = end
+    return [(''.join(main), 0), *sources]
 
 
 def scan_tokens(tokens, text, relative):

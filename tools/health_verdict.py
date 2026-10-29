@@ -17,7 +17,7 @@ def validate_entry(entry):
         if entry.get(field) not in RESULT_WORDS:
             raise ValueError(f'{name}: invalid {field}')
     if entry['word'] == 'must fix' and (entry.get('kind') == 'pointer' or
-                                        name in ('T1', 'T2', 'T3', 'T4')):
+                                        name in ('T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'T8', 'G4')):
         raise ValueError(f'{name}: pointer or translation check can never be must fix')
 
 
@@ -54,7 +54,7 @@ def verdict(record):
             unchecked = True
             reasons.append(f'{name}: not checked')
     missing = [name for name in dict.fromkeys([f'H{n}' for n in range(1, 12)] +
-                                             [f'T{n}' for n in range(1, 9)] + required)
+                                             [f'T{n}' for n in range(1, 9)] + ['G4'] + required)
                if name not in seen]
     decision = 'fail' if failed else 'incomplete' if unchecked or missing else 'pass'
     return outcome({'pass': 'clean', 'fail': 'finding', 'incomplete': 'not checked'}[decision],

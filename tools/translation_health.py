@@ -120,7 +120,7 @@ def main(args):
         if not repo.is_dir():
             parser.error('repo must be a readable directory')
         next(repo.iterdir(), None)
-        lang = options.lang.resolve() if options.lang is not None else repo / 'lang'
+        lang = (repo / options.lang).resolve() if options.lang is not None else repo / 'lang'
         if options.lang is None and not lang.is_dir():
             lang = repo / 'resources/lang'
         extra = [part for flag, path in (('--changed-files', options.changed_files), ('--base-lang', options.base_lang))
@@ -131,8 +131,8 @@ def main(args):
         source = scan(repo, changed)
         output = health(report, base, source, controller_pages(repo, source[0]))
         prefix = lang.relative_to(repo).as_posix().rstrip('/') + '/' if lang.is_relative_to(repo) else None
-        output['no_translation_files_changed'] = changed is not None and not any(
-            path.startswith(prefix) for path in changed if prefix is not None)
+        output['no_translation_files_changed'] = prefix is not None and changed is not None and not any(
+            path.startswith(prefix) for path in changed)
     except (OSError, UnicodeError, ValueError) as error:
         parser.error(str(error))
     print(json.dumps(output, ensure_ascii=True))

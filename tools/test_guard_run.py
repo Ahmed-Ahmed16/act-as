@@ -162,7 +162,8 @@ class GuardRunTests(unittest.TestCase):
                                       command=expected, worktree_removed=True, exit_code=0,
                                       stdout_path=str(self.out / 'debate-stdout.txt'),
                                       stderr_path=str(self.out / 'debate-stderr.txt')))
-        self.runner.assert_called_once_with(expected, capture_output=True, text=True)
+        self.runner.assert_called_once_with(expected, capture_output=True, text=True,
+                                            encoding='utf-8', errors='replace')
         for call in self.runner.call_args_list:
             command = call.args[0]
             self.assertIn('--dry-run', command)
@@ -177,7 +178,7 @@ class GuardRunTests(unittest.TestCase):
             with self.subTest(leave_behind=leave_behind):
                 new = self.tmp / 'debate-review-x'
 
-                def fake_runner(command, capture_output, text):
+                def fake_runner(command, capture_output, text, encoding, errors):
                     self.assertIn('--dry-run', command)
                     new.mkdir()
                     if not leave_behind:
@@ -197,7 +198,7 @@ class GuardRunTests(unittest.TestCase):
         self.install()
         for leave_behind in (False, True):
             with self.subTest(leave_behind=leave_behind):
-                def fake_runner(command, capture_output, text):
+                def fake_runner(command, capture_output, text, encoding, errors):
                     if leave_behind:
                         (self.tmp / 'debate-review-floop').touch()
                     return subprocess.CompletedProcess(command, 7, '', 'failed')
@@ -240,6 +241,35 @@ class GuardRunTests(unittest.TestCase):
                                  env={'ACT_AS_SKILLS_DIR': str(self.skills)})
         self.assertTrue(outcome['ran'])
         self.assertTrue(outcome['worktree_removed'])
+
+    def test_debate_utf8_child_output_is_saved(self):
+        self.install()
+
+        def child_runner(command, **kwargs):
+            return subprocess.run([sys.executable, '-c',
+                                   'import sys; sys.stdout.buffer.write(bytes([217, 129]))'],
+                                  **kwargs)
+
+        outcome = self.debate(runner=child_runner)
+        self.assertTrue(outcome['ran'])
+        self.assertTrue(outcome['worktree_removed'])
+        self.assertEqual((self.out / 'debate-stdout.txt').read_text(encoding='utf-8'), '\u0641')
+
+    def test_debate_runner_uses_utf8_with_replacement(self):
+        self.install()
+        outcome = self.debate()
+        self.assertTrue(outcome['ran'])
+        self.runner.assert_called_once_with(outcome['command'], capture_output=True, text=True,
+                                            encoding='utf-8', errors='replace')
+
+    def test_debate_missing_streams_write_empty_evidence(self):
+        self.install()
+        self.runner.return_value = subprocess.CompletedProcess([], 0, None, None)
+        outcome = self.debate()
+        self.assertTrue(outcome['ran'])
+        self.assertTrue(outcome['worktree_removed'])
+        for stream in ('stdout', 'stderr'):
+            self.assertEqual((self.out / f'debate-{stream}.txt').read_bytes(), b'')
 
     def test_cli_reports_skills_targets_and_gate(self):
         self.install('zindle')
