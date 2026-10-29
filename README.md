@@ -71,5 +71,6 @@ The full text is in `LICENSE`.
 Some files are not covered by this licence:
 
 - `roles/tester/borrowed/pstack/` stays under its own MIT licence.
-- Short quotes from books in card `anchor` fields belong to their authors.
+- Short quotes from books and web pages in card `anchor` and other card lines belong to their authors. Pages we chose not to quote are cited by URL or in our own words.
+- Each source a reviewer card uses has an entry in `THIRD-PARTY-NOTICES.md`.
 - See `THIRD-PARTY-NOTICES.md` for details.

@@ -8,7 +8,6 @@ mode: all
 trigger: Before touching checkout files or external systems
 kind: source-advice
 source: OWASP Secure Product Design Cheat Sheet, The principle of Least Privilege and Separation of Duties, https://cheatsheetseries.owasp.org/cheatsheets/Secure_Product_Design_Cheat_Sheet.html, read 2026-10-26 ; second source: OWASP Authorization Cheat Sheet, Enforce Least Privileges, https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html, read 2026-10-26
-anchor: "users should only be given the minimum amount of access"
 status: approved
-review: drafted by gpt-6-luna effort max, 2026-10-26 (relay record); checked against the raw source by claude-sonnet-5-5, 2026-10-26, CHECK PASS: anchor verbatim in the OWASP Secure Product Design page; supports least privilege, the read only boundary is a project choice; approved by Ahmed 2026-10-26, as drafted
+review: drafted by gpt-6-luna effort max, 2026-10-26 (relay record); checked against the raw source by claude-sonnet-5-5, 2026-10-26, CHECK PASS: anchor verbatim in the OWASP Secure Product Design page; supports least privilege, the read only boundary is a project choice; approved by Ahmed 2026-10-26, as drafted; edited 2026-10-28 for licence (Ahmed's call 2), anchor removed
 extra: The access and separation rules support a limited role; the checkout, site, tracker and packet folder are this project's boundaries.

@@ -150,6 +150,13 @@ Developer:
 - Clean room method and its legal basis: source not chosen yet.
 - Refactoring in small safe steps: source not chosen yet.
 
+Licence notices, other roles:
+
+- Tester, manager and developer cards that cite a URL (31 approved cards on
+  2026-10-28: 29 tester, 2 manager, 0 developer) have no entry in
+  `THIRD-PARTY-NOTICES.md` and no licence check. Ticket 50 covers reviewer
+  cards only. Needs its own ticket.
+
 ## Card gate bugs, fixed 2026-10-15
 
 Found by `tools/test_cards.py`, each now pinned by a test.
