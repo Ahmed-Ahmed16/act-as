@@ -4,13 +4,13 @@ Ask one thing: will this change hurt to change later? Health has 10 checks
 here (H1 to H10). Each check has a tool part and a reading part. A tool hit
 alone is never a finding. This mode runs no size, business or security check.
 
-Not written here yet, each in its own later step:
+Built, each in its own step:
 
-- The 8 translation checks and the user visible text pointer: ticket 38.
+- The 8 translation checks and the user visible text pointer are built: `tools/translation_health.py` and `tools/translation_health_scan.py`, step 16.
 - `clean-code-guard`, `test-guard`, `docs-guard`, `debate-review`: see the block "Guard skills and debate-review (ticket 37)" below.
 
-Their steps are marked below. Until they exist, say each one is
-`not checked: <name> not built yet`. Health is then `incomplete`, never `pass`.
+Their steps are marked below. When one cannot run, write
+`not checked: <reason>`. Health is then `incomplete`, never `pass`.
 
 ## The 4 result words
 
@@ -67,12 +67,14 @@ Before each step, run `cards.py reviewer health <step number>`, for example
    part of the same file is not reported. The tool calls must show the whole
    file was read. For each finding write one of: "PR added it", "PR left it
    in a touched area". If neither is true, drop it.
+   Whole file reading cards: `REV-447`, `REV-448`.
 3. **H1 Copied logic.** Tool: jscpd with `--baseline-from-ref <comparison
    base>` and `--fail-on-new-clones=0`, the role's own settings, format php,
    report json with `-r json`. Classify with `health_parse.py jscpd`. Reading:
    short copies jscpd cannot see, such as the same 2 line "card is active"
    check typed in 3 controllers and again in an export (question 18). The
    clone count is a floor.
+   Copied logic cards: `REV-401` to `REV-403`.
 4. **H2 Long methods and files.** Tool: PHPMD `ExcessiveMethodLength` and
    `ExcessiveClassLength` (1 class, not a whole file) on the changed PHP
    files, and the line count of each changed file. PHPMD runs with its own
@@ -80,20 +82,23 @@ Before each step, run `cards.py reviewer health <step number>`, for example
    `rulesets/codesize.xml`; read in the image 2026-10-27). Do not pass other
    limits. Every number from this step is a pointer (see "Pointers").
    Reading: questions 6 and 17.
+   Long method and class cards: `REV-404`, `REV-405`.
 5. **H3 One class, many jobs.** Tool: `health_search.py routes` counts the
    route lines per touched controller. The count is a pointer and never a
    finding. 10 or more route lines on 1 controller make a pointer (the script
    sets `pointer`); 9 or fewer do not. The pointer
-   sends you to questions 11 and 13 (until the question 12 card can load; then
-   12 and 13). A `Route::resource` line counts as 1 line but is many routes;
+   sends you to questions 12 and 13 (step 21 loads the question 12 card). A `Route::resource` line counts as 1 line but is many routes;
    say so. Reading: questions 11, 12 and 13.
+   Route count card: `REV-407`.
 6. **H4 Logic or queries in controllers.** Tool: search the changed controllers
    for query calls (`DB::`, `::where(`, `->where(`, `::query(`, `->get(`,
    `->join(`). Each hit is only a candidate. Open it and read whether the
    query or business rule belongs there. A hit you did not read is not a
    finding.
+   Controller query card: `REV-408`.
 7. **H5 N+1.** No tool. Reading: a lazy loaded relation read inside a loop
    over many rows. Always a `lead`, never `finding` and never `must fix`.
+   Lazy relation card: `REV-409`.
 8. **H6 Risky areas with no tests.** Risky means money, logins, deleting data,
    plus the risky areas from the business step. In a health only run there is
    no business step: use money, logins and deleting data only, and write
@@ -114,15 +119,18 @@ Before each step, run `cards.py reviewer health <step number>`, for example
    areas: none found in the changed files". Not checked always holds
    "business risky areas: not asked: health run only". Never write the tool's
    list as a finding by itself.
+   Risky area test cards: `REV-410` to `REV-412`.
 9. **H7 Old tests edited or deleted.** Tool: `git diff -M --name-status
    <comparison base> <head>`. Judge each deleted or changed test by lost
    protection: does it still fail when the code breaks? A reason in the PR text
    does not count. A lost protection, confirmed in the code, is `must fix`.
+   Changed test cards: `REV-413`, `REV-414`.
 10. **H8 Dead code.** Tool: PHPMD `UnusedPrivateMethod` and
     `UnusedLocalVariable`, and PHPStan at level 4 (unused private methods,
     unreachable code, dead branches; not unused public or protected methods).
     Reading: `clean-code-guard` imperative 21 (ticket 37; until then, read for
     code nobody calls).
+    Dead code cards: `REV-415` to `REV-417`.
 11. **H9 Bugs.** Tool: PHPStan with Larastan at level 5, classified by
     `health_parse.py phpstan`. A line saying an ignored pattern "was not
     matched" is a stale baseline entry, not a bug; report the count. A run
@@ -130,6 +138,7 @@ Before each step, run `cards.py reviewer health <step number>`, for example
     Reading:
     open every error and confirm it. A bug the PR adds, once confirmed, is
     `must fix` whichever tool found it. A bug already there is a `lead`.
+    Bug reading cards: `REV-418` to `REV-421`.
 12. **H10 Cost to add.** No tool. Propose 1 realistic small feature in the
     area the PR touches, in 1 line (from the rules page when there is one;
     the user may name another). Write the list of files that must change on
@@ -138,6 +147,7 @@ Before each step, run `cards.py reviewer health <step number>`, for example
     estimate: state the feature and the assumptions and mark uncertain files.
     When the area existed before, count the same feature on the base and on
     the head. Next to it, ask question 11 for the riskiest rule the PR touches.
+    Cost and design burden cards: `REV-422` to `REV-424`.
 13. **Laravel reading prompts.** Read, for the changed files that fit:
     migrations (existing rows, order, rollback, a column change that drops its
     modifiers); config and env (`env()` outside config files breaks under
@@ -149,6 +159,8 @@ Before each step, run `cards.py reviewer health <step number>`, for example
     apart). A refactor PR needs a record of old behaviour: tests that pass
     unchanged on base and head, or the output of base and head on 1 case at
     least (question 31). Each prompt ends in a result word.
+    Laravel reading cards: `REV-431` to `REV-441`.
+    Edge case, old behaviour and copied rule cards: `REV-442` to `REV-444`.
 14. **Fixed lists and limits typed in 2 or more places (G1, G2).** This links
     to questions 11 and 18. Search step (G2): for each fixed list, each single
     limit (a size, a count), and each helper like logic in a changed hunk, run
@@ -162,6 +174,7 @@ Before each step, run `cards.py reviewer health <step number>`, for example
     with a shown burden (the PR made the 2nd copy) and a small fix named in
     1 line (for example "move the list to `config/uploads.php`"). No copy: `clean`.
     An `incomplete` result is `not checked` because the search hit its cap.
+    Fixed list and copy search cards: `REV-445`, `REV-446`.
 15. **H11 and the independent check (tests that prove nothing).** Reading
     picks the tests; the tool breaks the code. Pick at most 3 tests that
     assert money, login or deleting data in changed code. Find them by what
@@ -196,6 +209,7 @@ Before each step, run `cards.py reviewer health <step number>`, for example
     the tests picked: say "covers N picked tests" and never "the tests are good".
     The command, the fault and the result stay in `independent-check.json`,
     apart from the CI evidence; Known risks names that file.
+    Independent test check cards: `REV-425` to `REV-430`.
 16. **Translation checks (T1 to T8, G4).** Run
     `python tools/translation_health.py --repo <copy of head> --lang <head lang folder: lang or resources/lang> --base-lang <lang folder at the comparison base> --changed-files <files.json>`
     and save its output in `runs/`. It reads files only. No changed language
@@ -232,6 +246,9 @@ Before each step, run `cards.py reviewer health <step number>`, for example
     values first, then `by_page`: each page, then "shared", then "no use
     found"). Findings go to Known risks, pointers to Pointers. A key passed
     through a variable is "not checked". Check record ids: T1 to T8, G4.
+    Translation check cards: `REV-601` to `REV-608`.
+    English key fact cards: `REV-609` to `REV-611`.
+    Layout and helper cards: `REV-612`, `REV-613`.
 17. **Pointers.** Every number from a tool or a guard is a pointer, including
     the 20 lines and complexity 10 of `clean-code-guard`. Each pointer gets 1
     line of judgement and a review question number. Example: "72 line method:
@@ -239,10 +256,10 @@ Before each step, run `cards.py reviewer health <step number>`, for example
     3 jobs (question 17)". A guard finding that is not a number stays a
     finding. A pointer never passes or fails health. The pointer map:
     a long new method, question 6; a small change inside a method that is
-    already long, question 17; a long class, questions 12 and 11 (11 and 13
-    until the question 12 card loads); many routes on 1 controller, questions
-    11 and 13 until the question 12 card loads, then 12 and 13; a copy,
-    question 18.
+    already long, question 17; a long class, questions 12 and 11; many routes
+    on 1 controller, questions 12 and 13; a copy, question 18. Question 12
+    loads only through step 21.
+    Pointer judgement cards: `REV-449`, `REV-450`.
 18. **The review questions.** Ask these 16 on every run, and answer each with
     1 line and a file:line, or "nothing to say":
     1. Is there a layer, interface, flag or setting no caller needs?
@@ -263,20 +280,25 @@ Before each step, run `cards.py reviewer health <step number>`, for example
     22. Does it follow the style of the code around it?
     23. Would the tests fail if the code broke?
 
-    Ask these 4 only when a pointer points there: 5 (heavy special cases), 6
-    (methods so small the reader jumps around), 9 (comments say why, not
-    what), 21 (a refactor mixed into a feature PR). Ask question 31 (a refactor
+    Ask question 5 when the diff has heavy special cases, question 9 when
+    comments say what instead of why, and question 21 when a refactor is
+    mixed into a feature PR. Ask question 6 (methods so small the reader
+    jumps around) only when a pointer points there. Ask question 31 (a refactor
     needs a record of old behaviour and proof) when the PR is a refactor or
     cleanup. Ask question 32 (docs updated when behaviour or setup changed)
     when the `docs-guard` trigger fires, and also when the PR adds behaviour
-    that no document mentions. Question 12 (one actor per class)
-    joins only when its card loads from `cards.py`; if it does not load, do not
-    ask it. Questions 14 and 19 are not asked in v1 (open). Questions 24 to 29
+    that no document mentions. Question 12 (1 actor per class) is not 1 of
+    the 16. Ask it only when the pointer map in step 17 sends you there, and
+    then run step 21 to load its card. Questions 14 and 19 are not asked in v1 (open). Questions 24 to 29
     belong to size and the packet; question 30 belongs to security. A design
     opinion with no shown harm is a pointer, never a finding.
+    Default question cards: `REV-501` to `REV-504`, `REV-507`, `REV-508`,
+    `REV-510`, `REV-511`, `REV-513` to `REV-518`, `REV-520`, `REV-521`.
+    Conditional question cards: `REV-505`, `REV-506`, `REV-509`, `REV-519`,
+    `REV-522`, `REV-523`.
 19. **Cost to add and verdict.** Write `runs/check-record.json` with an entry
-    for H1 to H10 (and for H11 and T1 to T8 as `not checked` until their
-    tickets exist). Run `python tools/health_verdict.py --record runs/check-record.json`.
+    for H1 to H11 and T1 to T8, using their tool and reading results.
+    Run `python tools/health_verdict.py --record runs/check-record.json`.
     The rules it applies:
     - `fail` only on a `must fix` finding confirmed in the code (`REV-P11`): a
       deleted or changed test that lost protection; a test that stays green
@@ -302,6 +324,12 @@ Before each step, run `cards.py reviewer health <step number>`, for example
     not sent; never send it. Run `python tools/packet_check.py <packet folder>`
     after the last write and show the packet only after `packet_check: pass`
     (`REV-P08`). Save the end snapshot and compare it with the start one.
+21. **Question 12, only on a pointer.** Run this step only when the pointer
+    map in step 17 sends you to question 12: a long class, or many routes on
+    1 controller. Never run it on its own. Ask question 12 (1 actor per
+    class) for that class or controller only, and answer it like the other
+    questions.
+    Question 12 card: `REV-512`.
 
 ## Guard skills and debate-review (ticket 37)
 
@@ -351,8 +379,8 @@ The helper is `python tools/guard_run.py`. It decides; you read the result.
 - [ ] Every tool classified by `health_parse.py`; jscpd file count quoted.
 - [ ] Route counts and copy searches quoted with `path:line`.
 - [ ] Every pointer has a judgement line and a question number.
-- [ ] The 16 questions answered; the extra ones only where a pointer points.
-- [ ] Marked places for H11, the translation checks and the guard skills left as `not checked`.
+- [ ] The 16 questions answered; questions 5, 9 and 21 where the diff shows the thing; the other extra ones only where a pointer points.
+- [ ] H11, the translation checks and the guard skills each have a result; one that could not run says `not checked: <reason>`.
 - [ ] `health_verdict.py` output quoted and the health line matches it.
 - [ ] Packet check output quoted (`packet_check: pass`).
 - [ ] Start and end snapshot compared, result quoted.

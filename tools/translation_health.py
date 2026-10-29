@@ -1,11 +1,15 @@
-"""By page has scope and groups of distinct keys. See translation_health_scan for G4 rules and source scan limits. No PHP runs."""
+"""By page groups distinct keys, joining controllers to 1 literal Blade view.
+Dynamic or multiple view names stay unlinked. No PHP runs.
+See translation_health_scan for G4 rules and source scan limits.
+"""
 import argparse
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
 from translation_keys import changed_paths
-from translation_health_scan import scan
+from translation_health_scan import TOKEN, arguments, literal, scan
 
 
 class Arguments(argparse.ArgumentParser):
@@ -32,7 +36,39 @@ def identity(entry):
     return entry['shape'], entry['file'], entry['key']
 
 
-def health(report, base, source):
+def rendered_views(text):
+    # Cases: no call, 1 literal, repeated literal, dynamic name, multiple views.
+    tokens = [(match.group(), match.start()) for match in TOKEN.finditer(text)
+              if not match.group().startswith(('//', '#', '/*'))]
+    names = set()
+    for index, (token, _) in enumerate(tokens):
+        if token != '(':
+            continue
+        context = [part for part, _ in tokens[max(0, index - 3):index]]
+        if context != ['View', '::', 'make'] and not (
+                context[-1:] == ['view'] and context[-2:-1] not in (['::'], ['$'])):
+            continue
+        parts, _ = arguments(tokens, index)
+        names.add(literal(parts[0]) if parts else None)
+    return names
+
+
+def controller_pages(repo, calls):
+    pages = {}
+    for path in sorted({call['path'] for call in calls if call['path'].startswith('app/Http/Controllers/')}):
+        names = rendered_views((repo / path).read_text(encoding='utf-8-sig'))
+        if len(names) != 1:
+            continue
+        name = next(iter(names))
+        if name is None or not re.fullmatch(r'[\w-]+(?:[./][\w-]+)*', name):
+            continue
+        view = 'resources/views/' + name.replace('.', '/') + '.blade.php'
+        if (repo / view).is_file():
+            pages[path] = view
+    return pages
+
+
+def health(report, base, source, pages):
     calls, raw, visible = source
     used, locales_by_key, forms = {}, {}, {}
     for call in calls:
@@ -43,7 +79,8 @@ def health(report, base, source):
         forms.setdefault(entry['key'], {})[entry['locale']] = entry['plural_forms']
     locales = set().union(*locales_by_key.values())
     def page(key):
-        paths = {location.rsplit(':', 1)[0] for location in used.get(key, [])}
+        paths = {pages.get(path, path) for location in used.get(key, [])
+                 for path in [location.rsplit(':', 1)[0]]}
         return next(iter(paths)) if len(paths) == 1 else 'shared' if paths else 'no use found'
     base_ids = {identity(entry) for entry in base['values']} if base is not None else set()
     groups = {}
@@ -91,7 +128,8 @@ def main(args):
         report = keys_report(lang, extra)
         base = keys_report(options.base_lang) if options.base_lang is not None else None
         changed = changed_paths(options.changed_files) if options.changed_files is not None else None
-        output = health(report, base, scan(repo, changed))
+        source = scan(repo, changed)
+        output = health(report, base, source, controller_pages(repo, source[0]))
         prefix = lang.relative_to(repo).as_posix().rstrip('/') + '/' if lang.is_relative_to(repo) else None
         output['no_translation_files_changed'] = changed is not None and not any(
             path.startswith(prefix) for path in changed if prefix is not None)

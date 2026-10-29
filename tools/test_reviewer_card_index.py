@@ -79,6 +79,7 @@ class ReviewerCardIndexTests(unittest.TestCase):
     def setUp(self):
         self.assertTrue(INDEX_PATH.is_file(), f'Missing index: {INDEX_PATH}')
         self.text = INDEX_PATH.read_text(encoding='utf-8')
+        self.gap_example = '## Check map\n| `S5` | `gap` |\n\n## Card gap list\n- S5\n'
 
     def assert_problem_names(self, problems, check_id):
         self.assertTrue(problems, f'{check_id}: expected a validation problem')
@@ -88,28 +89,29 @@ class ReviewerCardIndexTests(unittest.TestCase):
         self.assertEqual(check_index(self.text, EXPECTED_IDS, CARD_DIR), [])
 
     def test_missing_or_empty_check_row_fails(self):
+        self.assertEqual(check_index(self.gap_example, ['S5'], CARD_DIR), [])
         cases = [
-            ('S5', self.text.replace('| `S5` | `gap` |\n', '').replace('- S5\n', ''),
-             EXPECTED_IDS),
-            ('S99', self.text.replace('## Check map\n',
+            ('S5', self.gap_example.replace('| `S5` | `gap` |\n', '').replace('- S5\n', ''),
+             ['S5']),
+            ('S99', self.gap_example.replace('## Check map\n',
                                      '## Check map\n| `S99` | |\n'),
-             EXPECTED_IDS + ['S99']),
+             ['S5', 'S99']),
         ]
         for check_id, text, expected in cases:
             with self.subTest(check_id=check_id):
                 self.assert_problem_names(check_index(text, expected, CARD_DIR), check_id)
 
     def test_mapped_card_without_file_fails(self):
-        text = self.text.replace('| `S5` | `gap` |', '| `S5` | `REV-P99` |')
+        text = self.gap_example.replace('| `S5` | `gap` |', '| `S5` | `REV-P99` |')
         text = text.replace('- S5\n', '')
         with tempfile.TemporaryDirectory(prefix='reviewer-index-') as folder:
-            problems = check_index(text, EXPECTED_IDS, Path(folder))
-        self.assertIn('S5: REV-P99: card file missing', problems)
+            problems = check_index(text, ['S5'], Path(folder))
+        self.assertEqual(problems, ['S5: REV-P99: card file missing'])
 
     def test_gap_missing_from_list_fails(self):
-        text = self.text.replace('- S5\n', '')
-        problems = check_index(text, EXPECTED_IDS, CARD_DIR)
-        self.assertIn('S5: gap missing from gap list', problems)
+        text = self.gap_example.replace('- S5\n', '')
+        problems = check_index(text, ['S5'], CARD_DIR)
+        self.assertEqual(problems, ['S5: gap missing from gap list'])
 
     def test_mapped_draft_card_fails(self):
         text = '## Check map\n| `Q1` | `REV-P99` |\n\n## Card gap list\n'
@@ -150,8 +152,8 @@ class ReviewerCardIndexTests(unittest.TestCase):
         self.assertEqual(problems, ['S99: unexpected check map id'])
 
     def test_gap_list_id_without_gap_row_fails(self):
-        text = self.text.replace('| `S5` | `gap` |', '| `S5` | `REV-P01` |')
-        problems = check_index(text, EXPECTED_IDS, CARD_DIR)
+        text = self.gap_example.replace('| `S5` | `gap` |', '| `S5` | `REV-P01` |')
+        problems = check_index(text, ['S5'], CARD_DIR)
         self.assertEqual(problems, ['S5: gap list id is not marked gap in check map'])
 
     def test_invalid_policy_card_fails(self):
@@ -170,8 +172,8 @@ class ReviewerCardIndexTests(unittest.TestCase):
             self.assertEqual(check_index(text, ['Q1'], card_dir), [])
 
     def test_duplicate_check_row_fails(self):
-        text = self.text.replace('## Check map\n', '## Check map\n| `S5` | `gap` |\n')
-        problems = check_index(text, EXPECTED_IDS, CARD_DIR)
+        text = self.gap_example.replace('## Check map\n', '## Check map\n| `S5` | `gap` |\n')
+        problems = check_index(text, ['S5'], CARD_DIR)
         self.assertEqual(problems, ['S5: duplicate check map row'])
 
 

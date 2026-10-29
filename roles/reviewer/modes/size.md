@@ -44,6 +44,7 @@ Before each step, run `cards.py reviewer size <step number>`, for example
    Only the words "review it anyway" from the user lift the cap, and a size
    mode run has nothing to lift. A fail is written as the over the cap
    packet in step 5. Size line and over the cap cards: `REV-108`, `REV-109`.
+   REV-109 is background on the cap; a size run writes no split request.
 5. **Write the packet.** (Over the cap: use the changes at the end of this
    step.) File `packet.md` in the packet folder, in the
    packet format the packet check reads. Identity line with `mode=size`. The
@@ -63,6 +64,7 @@ Before each step, run `cards.py reviewer size <step number>`, for example
    `rules-pages.json`: `{"areas": []}`.
    Reading and identity line cards: `REV-110` to `REV-113`, `REV-119`,
    `REV-120`.
+   REV-112 is background on a good split; a size run writes no split request.
 
    **Over the cap (size line is `fail`).** Same file, same fields, with these
    changes only. The size line is the step 4 fail line with its counts. The

@@ -92,6 +92,23 @@ class UnwiredCardCheckTests(unittest.TestCase):
 
 class RealReviewerWiringTests(unittest.TestCase):
     # Known good: the real role files.
+    def test_health_questions_5_9_21_apply_to_the_diff_without_a_pointer(self):
+        # G41: the real gate must print the conditions agreed in B17.
+        run = run_gate('reviewer', 'health', '18')
+        self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
+        printed = dict(re.findall(r'^== (REV-\w+) \|[^\n]*\n(.*?)(?=^== |\Z)',
+                                  run.stdout, re.MULTILINE | re.DOTALL))
+        for card_id in ['REV-505', 'REV-509', 'REV-519']:
+            self.assertIn(card_id, printed)
+            fields = dict(re.findall(r'^([\w-]+): *(.*)$', printed[card_id], re.MULTILINE))
+            for field in ['applies-when', 'extra']:
+                with self.subTest(card_id=card_id, field=field):
+                    if field == 'applies-when':
+                        self.assertTrue(fields[field].startswith('The PR '), fields[field])
+                    else:
+                        self.assertIn('asked when the diff shows the relevant change.', fields[field])
+                    self.assertNotIn('pointer', fields[field])
+
     def test_every_approved_reviewer_card_is_loaded_by_a_step(self):
         self.assertEqual(unwired_cards(REAL_ROLE), [])
 
@@ -121,13 +138,27 @@ class RealReviewerWiringTests(unittest.TestCase):
             with self.subTest(card_id=card_id):
                 self.assertIn('size', [mode for mode, _ in loading_steps(REAL_ROLE, card_id)])
 
-    def test_business_rerun_steps_20_to_25_load_and_list_no_card(self):
+    def test_business_rerun_steps_20_to_25_load_their_approved_cards(self):
         self.assertTrue(set(RERUN_STEPS) <= set(cards.steps(REAL_ROLE, 'business')))
+        expected = {'20': ['REV-233', 'REV-236', 'REV-239'], '21': ['REV-234'],
+                    '22': ['REV-235'], '23': [], '24': ['REV-237'], '25': ['REV-238']}
         for step in RERUN_STEPS:
             with self.subTest(step=step):
                 run = run_gate('reviewer', 'business', step)
                 self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
-                self.assertEqual(run.stdout, f'cards.py reviewer business {step}: 0 printed, 0 skipped\n')
+                self.assertEqual(run.stdout.splitlines()[0],
+                                 f'cards.py reviewer business {step}: {len(expected[step])} printed, 0 skipped')
+                self.assertEqual(re.findall(r'^== (REV-\w+) \|', run.stdout, re.MULTILINE), expected[step])
+
+    def test_question_12_loads_only_in_its_pointer_step(self):
+        # B23: question 12 is not in the default 16; only step 21 loads its card.
+        listed = re.compile(r'^== (REV-\w+) \|', re.MULTILINE)
+        default = run_gate('reviewer', 'health', '18')
+        self.assertEqual(default.returncode, 0, default.stdout + default.stderr)
+        self.assertNotIn('REV-512', listed.findall(default.stdout))
+        pointer = run_gate('reviewer', 'health', '21')
+        self.assertEqual(pointer.returncode, 0, pointer.stdout + pointer.stderr)
+        self.assertEqual(listed.findall(pointer.stdout), ['REV-512'])
 
     def test_a_rerun_step_number_that_does_not_exist_is_refused(self):
         run = run_gate('reviewer', 'business', '26')
