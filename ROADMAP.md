@@ -74,6 +74,10 @@ What is done, what is next, and what is still untested. Updated 2026-10-28.
    - Internal `tools/split_checks.py` checks group and part placement, links,
      rebuild steps, text only pages and records for parts over 300 lines.
      It checks recorded evidence without running commands.
+   - `python tools/split_plan.py build <packet folder>` checks the proposed
+     split, marks, language keys, pages and saved input records. It writes
+     `split-plan.json` with piece counts and hashes of the input bytes.
+     Rule failures exit 1. Bad or unreadable input exits 2.
    - 11 policy cards (REV-P01 to REV-P11) and 199 source cards (REV-101 to
      REV-613), all approved by the user. `cards.py reviewer --audit` shows 0
      skipped, and CI runs it beside the tester audit.
