@@ -121,7 +121,9 @@ class PacketCheckTests(unittest.TestCase):
             packet = replace_line(packet, field, STOP)
         for heading in HEADINGS[1:6]:
             packet = replace_body(packet, heading, STOP)
-        return replace_body(packet, 'Behaviour changed', 'orchard changes.\ngrove changes.')
+        return replace_body(packet, 'Behaviour changed',
+                            'group summary: orchard | orchard changes.\ngroup summary: grove | grove changes.\n'
+                            'Translations by page: ' + STOP)
 
     def override_packet(self):
         return CAP_LINE + '\n' + replace_line(good_packet(), 'size', 'fail, 120 counted lines')
@@ -364,8 +366,26 @@ class PacketCheckTests(unittest.TestCase):
         self.assert_rules(replace_body(self.short_packet(), 'Known risks', 'none'), 'short-line')
 
     def test_short_behaviour_fewer_lines_than_groups(self):
-        self.assert_rules(replace_body(self.short_packet(), 'Behaviour changed', 'orchard changes.'),
+        self.assert_rules(replace_body(self.short_packet(), 'Behaviour changed',
+                                      'group summary: orchard | orchard changes.\nTranslations by page: ' + STOP),
                           'short-behaviour')
+
+    def test_B5_B6_short_translations_must_be_the_exact_line(self):
+        packet = self.short_packet()
+        exact = 'Translations by page: ' + STOP
+        for replacement in ['', 'Translations by page: pass', 'Translations by page: not checked']:
+            with self.subTest(replacement=replacement):
+                self.assert_rules(packet.replace(exact, replacement), 'short-translations')
+
+    def test_B7_B8_short_behaviour_names_match_each_group_once_in_order(self):
+        for summaries in [['orchard'], ['orchard', 'orchard'], ['grove', 'orchard']]:
+            with self.subTest(summaries=summaries):
+                body = '\n'.join('group summary: ' + name + ' | Changed.' for name in summaries)
+                body += '\npart: grove | Part of the work.\nTranslations by page: ' + STOP
+                self.assert_rules(replace_body(self.short_packet(), 'Behaviour changed', body), 'short-behaviour')
+
+    def test_B9_exact_translations_and_ordered_summaries_pass(self):
+        self.assert_pass(self.short_packet())
 
     def test_short_size_counts_missing(self):
         self.assert_rules(replace_line(self.short_packet(), 'size', 'fail'), 'short-size-counts')

@@ -53,7 +53,7 @@ An override needs the exact cap line above the identity, size fail with
 counts, and no verdict saying not checked because of the cap.
 Short packets have size fail with counts and the cap stop text in the
 other verdicts, money, and fields except Behaviour changed, Split plan,
-and Drafts, not sent. Behaviour changed needs at least 1 line per group.
+and Drafts, not sent. Behaviour changed needs ordered group summary lines and the exact cap stop Translations line.
 The split plan and draft must contain group lines.
 Single mode packets mark other modes not asked: <mode> run only.
 Only an asked size line has counts. A size fail also allows the cap stop
@@ -445,8 +445,12 @@ def short_failures(verdicts, bodies, plan):
     if any(body != CAP_STOP for body in stopped):
         failures.append(('short-line', 'short packet fields must say ' + CAP_STOP))
     behaviour = [line for line in bodies.get('Behaviour changed', '').splitlines() if line.strip()]
-    if len(behaviour) < len(plan['groups']):
-        failures.append(('short-behaviour', 'Behaviour changed needs at least 1 line per split group'))
+    summaries = [line[len('group summary: '):].split(' | ', 1)[0] for line in behaviour
+                 if line.startswith('group summary: ')]
+    if summaries != [group['name'] for group in plan['groups']]:
+        failures.append(('short-behaviour', 'group summaries must match split groups once in order'))
+    if 'Translations by page: ' + CAP_STOP not in behaviour:
+        failures.append(('short-translations', 'Translations by page must say ' + CAP_STOP))
     for rule, heading in [('short-split-plan', 'Split plan'), ('short-draft', 'Drafts, not sent')]:
         if not plan['groups'] or not re.search(r'^(?:[-*] )?group: ', bodies.get(heading, ''), re.MULTILINE):
             failures.append((rule, heading + ' needs split groups'))

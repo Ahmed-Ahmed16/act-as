@@ -228,7 +228,7 @@ class SplitBuildTests(unittest.TestCase):
         run = self.run_build()
         self.assertEqual((run.returncode, run.stderr), (0, ''), run.stdout + run.stderr)
         saved = json.loads((self.packet / 'split-plan.json').read_bytes())
-        self.assertEqual(set(saved), set('groups first_group_parts unplaced unplaced_keys unplaced_keys_check loop_notes main ci base head input_sha256 hunks_sha256 files_sha256'.split()))
+        self.assertEqual(set(saved), set('groups first_group_parts unplaced unplaced_keys unplaced_keys_check loop_notes main ci base head input_sha256 hunks_sha256 files_sha256 unplaced_marks'.split()))
         self.assertEqual(set(saved['groups'][0]), set('name entry_points estimate hunks summary needs links rebuild pages keys keys_check marks counted'.split()))
         self.assertEqual(set(saved['first_group_parts'][0]), set('name summary needs hunks counted marks rebuild stays_over'.split()))
         for field in ['unplaced', 'unplaced_keys', 'unplaced_keys_check', 'loop_notes', 'main', 'ci']:
@@ -238,6 +238,16 @@ class SplitBuildTests(unittest.TestCase):
             self.assertEqual(saved[field], hashlib.sha256(before[name]).hexdigest())
             self.assertEqual((self.packet / name).read_bytes(), before[name])
         self.assertEqual(saved['groups'][0]['estimate'], 8)
+
+    def test_unplaced_marks_survive_build_for_the_short_packet(self):
+        self.files['files'].append(dict(self.files['files'][3], path='app/Stray.py',
+                                       hunks=[dict(id='f5h1', counted_lines=2)]))
+        self.hunks['hunks'].append(dict(self.hunks['hunks'][3], id='f5h1', path='app/Stray.py'))
+        self.plan['unplaced'] = ['f5h1']
+        self.plan['marks'] = [dict(mark='unsure', pieces=['f5h1'])]
+        saved = self.built()
+        self.assertIn('unplaced_marks', saved)
+        self.assertEqual(saved['unplaced_marks'], ['unsure'])
 
     def test_M19_bad_files_are_stderr_only(self):
         self.built()
