@@ -24,6 +24,25 @@ What is done, what is next, and what is still untested. Updated 2026-10-28.
 
 ## Next
 
+0. **Reviewer v1.1** (v1 shipped with gates case 3 and case 5 only, 2026-10-29):
+   - gate runs deferred: case 2 (51), case 4 (53), case 9 (55), case 11 (56),
+     cases 1 and 7 (57), case 6 (58), final gate (59, the only one on 2 models);
+     full mode runs on pr31 and pr49 (ticket 39 items X1 to X6);
+   - 9 low findings from the v1 code review, not fixed yet:
+     `packet_check.py` needs files.json even for a business only or health only
+     run; full mode step 3a skips sub step 2f, which the build still needs;
+     `split_checks.py` compares raw path text for the unchanged file check;
+     `security_scan.py` runs the finders diff without `--no-color`;
+     `business_verdict.py` security line is not idempotent after "pass:";
+     `business_verdict.py` exits 2 with no line when no area is touched;
+     `guard_run.py` misses the first team login when the list has a BOM;
+     `health_search.py` undercounts `Route::controller` groups and multi line
+     routes; `translation_keys.py` reports lang files with
+     `declare(strict_types=1)` as unreadable;
+   - the outside write watch flags files that scheduled jobs write during a run;
+   - notices: the same check for tester, manager and developer cards (31 cards
+     with URLs).
+
 1. **Public release gate.** Each item needs a yes or a fix:
    - licence: done, MIT (2026-10-15);
    - the short book quotes in card `anchor` fields: done, kept (2026-10-15);
