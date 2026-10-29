@@ -280,6 +280,47 @@ Drafted 2026-10-27 by claude-sonnet-5-5 (ticket 49), checked and rechecked by cl
 | REV-612 | health, full | When a PR adds many keys to 1 language file | approved | layout | Suggest a common file plus 1 file per page, as a pointer only. |
 | REV-613 | health, full | When reading changed PHP and Blade for user visible text typed as a literal (G4) | approved | G4 | User visible text should go through the translation helper. A pointer. |
 
+## Split plan and entry point cards
+
+Drafted 2026-10-28 by claude-sonnet-5-5 for ticket 44, checked 2026-10-28 by
+claude-opus-5-5 against the raw sources (REV-134 and REV-138 rewritten for
+amendment B24). All 20 were approved by Ahmed on 2026-10-28. They have no check id in the check
+map, so the check id column says none. The step column names the sub step of
+full mode step 2 each card fits; full mode step 2 lists each card in its
+sub step. The size mode writes no split plan, so every card is `full`
+only. Cards that cite a Laravel docs page carry `docs_version`,
+`checked_same` and `differs_on`.
+
+| id | mode | trigger | status | check id | step | rule in short |
+| --- | --- | --- | --- | --- | --- | --- |
+| REV-121 | full | When listing the routes that really load | approved | none | 2b | Routes come from the route files that bootstrap/app.php loads; read it first. |
+| REV-122 | full | When tracing a route to the controller method or view it runs | approved | none | 2c | Read a route handler by its form: array, bare name in a controller group, resource, view. |
+| REV-123 | full | When checking the routes found by reading against route:list | approved | none | 2b | Compare the routes read with php artisan route:list, where the role may run it. |
+| REV-124 | full | When listing the console commands that really load | approved | none | 2b | A command is an entry point named by its signature; three places hold commands. |
+| REV-125 | full | When listing the scheduled jobs that really load | approved | none | 2b | A schedule line is in routes/console.php or withSchedule; it and its command are 1 entry. |
+| REV-126 | full | When listing the screens that really load | approved | none | 2b | A Blade view is a screen only through what shows it. |
+| REV-127 | full | When forming the groups of a split plan | approved | none | 2d | Group by entry point, never by file kind. |
+| REV-128 | full | When a changed file changes no behaviour | approved | none | 2d | A refactor, build file or cleanup is its own group: no behaviour change: <purpose>. |
+| REV-129 | full | When placing a changed test into a group or part | approved | none | 2e | Tests travel with the code they test. |
+| REV-130 | full | When a changed file belongs to more than 1 group | approved | none | 2e | List which zero context hunks of a shared file go to which group. |
+| REV-131 | full | When a changed file is a generated copy of a changed source | approved | none | 2e | A generated copy is 1 rebuild step in the part of its source. |
+| REV-132 | full | When placing a migration, a CSS or JS block, or a shared helper | approved | none | 2g | Put it in the first part that needs it; a helper used by 2 parts goes in the lower. |
+| REV-133 | full | When ordering the groups or parts of a split plan | approved | none | 2g | A part works once the parts below it are in; never needs a part above it. |
+| REV-134 | full | When a part needs 2 or more other parts | approved | none | 2g | It waits until every needed part is merged, then opens against main (B24). |
+| REV-135 | full | When a part would show half a behaviour | approved | none | 2g | Suggest a feature flag only then, and say to test the switch in its live state. |
+| REV-136 | full | When cutting group 1 into parts and a piece touches money, access or deletion | approved | none | 2h | Money, access and deletion each stand alone as a part. |
+| REV-137 | full | When a part cannot get under 300 counted lines | approved | none | 2h | Stay over only for 1 new class or method over 300 alone; name it; the user decides. |
+| REV-138 | full | When writing which branch each part opens against | approved | none | 2i | Every part opens against main after the parts it needs merge; the branches filter is the reason. |
+| REV-139 | full | When reading the CI workflow files for the split plan | approved | none | 2i | Record each on: block as written; unreadable stays unreadable. |
+| REV-140 | full | When writing the draft message to the PR author | approved | none | 2j | Open with the size sentence, end with the ask: open part 1 first; never looks good. |
+
+Entry point tracing rules left out for lack of ids in the range REV-121 to
+REV-140 (sourced in the research file, not drafted): jobs reached where they
+are dispatched; events and listeners; the default pull_request activity
+types; a merge conflict stopping pull_request runs; schedule workflows run
+only on the default branch; the YAML 1.1 reading of on; check runs for a head
+commit; reading a file at a commit with git show and git grep.
+
 ## Check map
 
 Policy cards cover role rules. A check mapped to `gap` still needs a check card.
