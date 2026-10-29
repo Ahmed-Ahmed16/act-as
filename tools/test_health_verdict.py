@@ -1,4 +1,4 @@
-# Cases: pass without G4, fail, missing H11 or translation ids, unchecked ids,
+# Cases: pass with G4, fail, missing H11 or translation ids, unchecked ids,
 # pointers, invalid records.
 import json
 import subprocess
@@ -17,7 +17,7 @@ class HealthVerdictTests(unittest.TestCase):
         self.entries = [dict(id=name, mode='health', tool_result='clean',
                              reading_result='clean', word='none', reason='Acme')
                         for name in [f'H{n}' for n in range(1, 12)] +
-                                    [f'T{n}' for n in range(1, 9)]]
+                                    [f'T{n}' for n in range(1, 9)] + ['G4']]
 
     def run_cli(self, *args):
         return subprocess.run([sys.executable, '-B', str(self.script), *map(str, args)],
@@ -52,6 +52,34 @@ class HealthVerdictTests(unittest.TestCase):
         self.assertEqual(document['verdict'], 'pass')
         self.assertEqual((document['missing'], document['reasons'], document['pointers']),
                          ([], [], 0))
+
+    def test_t5_to_t8_and_g4_must_fix_are_refused(self):
+        for name in ('T5', 'T6', 'T7', 'T8', 'G4'):
+            with self.subTest(name=name):
+                entry = dict(id=name, mode='health', kind='check', word='must fix',
+                             tool_result='finding', reading_result='clean')
+                original = self.entries
+                self.entries = [row for row in original if row['id'] != name] + [entry]
+                self.assert_bad(self.evaluate(), name)
+                self.entries = original
+
+    def test_missing_g4_makes_complete_health_record_incomplete(self):
+        self.entries = [entry for entry in self.entries if entry['id'] != 'G4']
+        document = self.document()
+        self.assertEqual(document['verdict'], 'incomplete')
+        self.assertEqual(document['missing'], ['G4'])
+
+    def test_g4_none_or_finding_completes_health_record(self):
+        self.entries = [entry for entry in self.entries if entry['id'] != 'G4']
+        g4 = dict(id='G4', mode='health', word='none',
+                  tool_result='clean', reading_result='clean')
+        self.entries.append(g4)
+        for word in ('none', 'finding'):
+            with self.subTest(word=word):
+                g4.update(word=word, tool_result='finding' if word == 'finding' else 'clean')
+                document = self.document(['G4'])
+                self.assertEqual(document['verdict'], 'pass')
+                self.assertEqual(document['missing'], [])
 
     def test_acme_missing_default_and_added_ids_are_incomplete(self):
         self.entries = [entry for entry in self.entries if entry['id'] != 'H10']

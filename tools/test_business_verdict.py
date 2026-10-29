@@ -47,12 +47,12 @@ class BusinessVerdictTests(unittest.TestCase):
             ([('zindle', 'pass'), ('floop', 'pass')],
              'business: pass, area zindle: every rule kept; area floop: every rule kept'),
             ([('zindle', 'incomplete'), ('floop', 'not checked'), ('plim', 'pass')],
-             'business: incomplete, area zindle: glorp; area floop: glorp'),
+             'business: incomplete, area zindle: glorp; area floop: glorp; area plim: every rule kept'),
             ([('zindle', 'not checked')], 'business: incomplete, area zindle: glorp'),
             ([('zindle', 'incomplete'), ('floop', 'fail'), ('plim', 'pass'),
               ('snorf', 'fail'), ('twib', 'not checked')],
              'business: fail, area floop: glorp; area snorf: glorp; '
-             'area zindle: glorp; area twib: glorp'),
+             'area zindle: glorp; area twib: glorp; area plim: every rule kept'),
         ]
         for states, expected in cases:
             with self.subTest(states=states):
@@ -74,6 +74,17 @@ class BusinessVerdictTests(unittest.TestCase):
         self.assert_bad(self.run_cli('verdict', '--areas', self.areas))
         self.areas.unlink()
         self.assert_bad(self.run_cli('verdict', '--areas', self.areas))
+
+    def test_open_verdict_keeps_every_area_and_passing_draft_notice(self):
+        for suffix in ('', ', rules page: draft, not in the repo yet'):
+            with self.subTest(suffix=suffix):
+                rows = [dict(area='loans', state='pass', reason='ok' + suffix),
+                        dict(area='fines', state='incomplete', reason='rules page for fines')]
+                run = self.verdict(rows)
+                self.assert_ok(run, 'business: incomplete, area fines: rules page for fines; '
+                               'area loans: every rule kept' + suffix)
+                for row in rows:
+                    self.assertIn('area ' + row['area'] + ':', run.stdout)
 
     def test_n3_passing_area_keeps_draft_notice(self):
         # Boundaries: exact or embedded draft notice; ordinary or empty reason.

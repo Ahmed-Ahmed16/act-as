@@ -18,6 +18,7 @@ class DockerRunner:
     def __init__(self, **settings):
         self.settings = settings
         self.calls = []
+        self.sources = {}
         self.rules_dir = None
 
     def __call__(self, argv, **kwargs):
@@ -26,6 +27,14 @@ class DockerRunner:
         if argv[0] != 'docker':
             raise AssertionError('Unexpected host command: ' + repr(argv))
         self.calls.append(argv)
+        for tool in ('semgrep', 'composer', 'gitleaks'):
+            if tool in argv:
+                source = next(argv[n + 1].rsplit(':/src:', 1)[0]
+                              for n, arg in enumerate(argv)
+                              if arg == '-v' and ':/src:' in argv[n + 1])
+                root = Path(source)
+                self.sources[tool] = {path.relative_to(root).as_posix(): path.read_bytes()
+                                      for path in root.rglob('*') if path.is_file()}
         if argv[1] == 'version':
             failure = self.settings.get('docker', 0)
             if isinstance(failure, OSError):
@@ -173,6 +182,102 @@ class SecurityScanTests(unittest.TestCase):
         self.write('app/Leaf.php', "$this->authorize('read');\n$rows = query('id = ?', [$id]);\n")
         self.head = self.commit()
         self.assertEqual([h for h in self.finders()['hits'] if h['check'] == 'S4'], [])
+
+    # Cases: path scalar/lists/nesting, free text, secret shapes in paths.
+    def test_review_patch_paths_keep_repo_names_but_mask_secrets(self):
+        paths = ['resources/views/home/partials/a.blade.php',
+                 'app/home/Models/User.php', 'app/Users/admin/x.php']
+        private = '/home/ahmed/secret'
+        document = dict(files=paths, path=paths[0], paths=dict(scanned=paths),
+                        results=[dict(path=paths[1], extra=dict(lines=private))],
+                        text=private, extra=[private], lines=[private])
+        masked = self.scan.redact_strings(document)
+        self.assertEqual(masked['files'], paths)
+        self.assertEqual(masked['path'], paths[0])
+        self.assertEqual(masked['paths']['scanned'], paths)
+        self.assertEqual(masked['results'][0]['path'], paths[1])
+        self.assertEqual(masked['results'][0]['extra']['lines'], '[redacted]secret')
+        self.assertEqual(masked['text'], '[redacted]secret')
+        self.assertEqual(masked['extra'], ['[redacted]secret'])
+        self.assertEqual(masked['lines'], ['[redacted]secret'])
+        secret = 'ghp_' + 'k' * 24
+        self.assertEqual(self.scan.redact_strings(dict(path='app/' + secret + '.php')),
+                         dict(path='app/[redacted].php'))
+        self.assertEqual(self.scan.redact_strings(dict(files=["env('KEY', 'private')"])),
+                         dict(files=["env('KEY', '[redacted]')"]))
+
+    def test_review_patch_paths_survive_saved_finder_report(self):
+        path = 'resources/views/home/partials/a.blade.php'
+        self.write(path, '{!! $x !!} /home/ahmed/secret\n')
+        self.head = self.commit()
+        report = self.finders()
+        self.assertIn(path, report['files'])
+        hit, = [hit for hit in report['hits'] if hit['check'] == 'S8']
+        self.assertEqual(hit['path'], path)
+        self.assertEqual(hit['text'].rstrip('\r'), '{!! $x !!} [redacted]secret')
+
+    def test_review_patch_paths_survive_semgrep_reports(self):
+        path = 'resources/views/home/partials/a.blade.php'
+        self.write(path, '<?php exec($x);\n')
+        self.head = self.commit()
+        selected = ['app/Fern.php', path]
+        self.file_rows([(name, 'added') for name in selected])
+        payload = dict(results=[dict(check_id=EXEC_RULE, path=path, start=dict(line=1),
+                                    extra=dict(lines='/home/ahmed/secret'))],
+                       paths=dict(scanned=selected))
+        scan = self.tools(DockerRunner(payload=json.dumps(payload).encode()))['tools']['semgrep']
+        self.assertEqual(scan['status'], 'ran')
+        self.assertEqual(scan['paths'], selected)
+        self.assertEqual(scan['findings'][0]['path'], path)
+        raw = json.loads((self.out / 'semgrep-raw.json').read_text(encoding='utf-8'))
+        self.assertEqual(raw['results'][0]['path'], path)
+        self.assertEqual(raw['paths']['scanned'], selected)
+        self.assertEqual(raw['results'][0]['extra']['lines'], '[redacted]secret')
+
+    # Cases: head suppressions, no config, unrelated config, malformed/nonobject JSON.
+    def test_review_patch_config_head_suppressions_are_removed_from_scan(self):
+        self.write('.gitleaks.toml', '[allowlist]\npaths = [".*"]\n')
+        config_bytes = (self.repo / '.gitleaks.toml').read_bytes()
+        self.write('.gitleaksignore', 'planted-fingerprint\n')
+        composer = dict(name='fern/leaf', require={'fern/stem': '^1.0'},
+                        config={'audit': {'ignore': {'PKSA-x': 'y'}}, 'sort-packages': True})
+        self.write('composer.json', json.dumps(composer))
+        self.head = self.commit()
+        runner = DockerRunner()
+        report = self.tools(runner)
+        for tool in ('semgrep', 'composer_audit', 'gitleaks'):
+            self.assertEqual(report['tools'][tool]['status'], 'ran')
+        command = next(argv for argv in runner.calls if 'gitleaks' in argv)
+        trusted = 'GITLEAKS_CONFIG_TOML=[extend]\nuseDefault = true'
+        with self.subTest(setting='trusted gitleaks config'):
+            self.assertIn(trusted, command)
+            self.assertEqual(command[command.index(trusted) - 1], '-e')
+            self.assertLess(command.index(trusted), command.index(report['image']))
+        with self.subTest(setting='gitleaks comments'):
+            self.assertIn('--ignore-gitleaks-allow', command)
+        for tool in ('semgrep', 'composer', 'gitleaks'):
+            with self.subTest(tool=tool, setting='fingerprints'):
+                self.assertNotIn('.gitleaksignore', runner.sources[tool])
+            with self.subTest(tool=tool, setting='composer config'):
+                self.assertEqual(runner.sources[tool]['.gitleaks.toml'],
+                                 config_bytes)
+                exported = json.loads(runner.sources[tool]['composer.json'])
+                self.assertEqual(exported, dict(name='fern/leaf', require={'fern/stem': '^1.0'},
+                                               config={'sort-packages': True}))
+        command = next(argv for argv in runner.calls if 'semgrep' in argv)
+        self.assertIn('--disable-nosem', command)
+
+    def test_review_patch_config_other_or_invalid_composer_is_kept(self):
+        for contents in ('{"config":{"sort-packages":true},"name":"fern/leaf"}',
+                         '{broken JSON\n', '[]', 'null', '{"config":[]}'):
+            with self.subTest(contents=contents):
+                self.write('composer.json', contents)
+                original = (self.repo / 'composer.json').read_bytes()
+                self.head = self.commit()
+                runner = DockerRunner()
+                report = self.tools(runner)
+                self.assertEqual(report['tools']['composer_audit']['status'], 'ran')
+                self.assertEqual(runner.sources['composer']['composer.json'], original)
 
     def test_all_finder_patterns_and_side_filters(self):
         fixtures = [

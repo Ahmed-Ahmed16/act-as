@@ -89,6 +89,56 @@ class TranslationHealthTests(unittest.TestCase):
             dict(key='orders.title', shape='php', file='orders.php', locales_with=['en'],
                  locales_missing=['ar'], touched_by_pr='yes', page='app/Parcel.php')])
 
+    def test_lang_paths_never_skip_changed_translations_outside_cwd(self):
+        with tempfile.TemporaryDirectory(prefix='other-cwd-') as folder:
+            cwd = Path(folder)
+            (cwd / 'lang').mkdir()
+            changed = self.changed(['lang/en/orders.php'])
+            for lang in ('lang', cwd / 'lang', self.root / 'lang'):
+                with self.subTest(lang=lang):
+                    run = subprocess.run(
+                        [sys.executable, '-B', str(self.script), '--repo', str(self.root),
+                         '--lang', str(lang), '--changed-files', str(changed)],
+                        cwd=cwd, capture_output=True, text=True, encoding='utf-8')
+                    self.assertEqual(run.returncode, 0, run.stderr)
+                    self.assertFalse(json.loads(run.stdout)['no_translation_files_changed'])
+            changed = self.changed(['app/Parcel.php'])
+            self.assertTrue(self.report('--lang', self.root / 'lang', '--changed-files', changed)
+                            ['no_translation_files_changed'])
+
+    def test_blade_code_regions_survive_html_quotes_and_apostrophes(self):
+        cases = [
+            ("@section('title', __('Used'))\n<x-input :label=\"__('Email')\" />\n"
+             "<p>Don't do this</p>\n@php $t = __('messages.hidden'); @endphp\n<p>it's</p>\n",
+             [('Used', 1), ('Email', 2), ('messages.hidden', 4)]),
+            ("<p>Don't</p>\n@include('x', ['t' => __('between')])\n<p>it's</p>",
+             [('between', 2)]),
+            ("<p>Don't</p>\n<?php __('php'); ?>\n<?= __('short') ?>\n"
+             "<x-input :label='__(\"single\")' />",
+             [('php', 2), ('short', 3), ('single', 4)]),
+            ("<?php $x = '?>'; __('after.php'); ?>\n"
+             "@php $x = '@endphp'; __('after.blade'); @endphp",
+             [('after.php', 1), ('after.blade', 2)]),
+            ("@php($t = __('first'))\n<p>Don't</p>\n"
+             "@php $u = __('second'); @endphp",
+             [('first', 1), ('second', 3)]),
+        ]
+        for source, expected in cases:
+            with self.subTest(source=source):
+                path = self.write('resources/views/regions.blade.php', source)
+                calls, _, _ = scan_file(path, 'resources/views/regions.blade.php')
+                self.assertEqual([(call['key'], call['line']) for call in calls], expected)
+
+    def test_blade_echoes_lang_comments_and_plain_php_stay_supported(self):
+        for filename, source, expected in [
+            ('resources/views/known.blade.php', "{{ __('a') }}\n{!! __('b') !!}\n@lang('c')\n"
+             "{{-- __('hidden') --}}", [('a', 1), ('b', 2), ('c', 3)]),
+            ('app/Known.php', "<?php __('d');", [('d', 1)]),
+        ]:
+            with self.subTest(filename=filename):
+                calls, _, _ = scan_file(self.write(filename, source), filename)
+                self.assertEqual([(call['key'], call['line']) for call in calls], expected)
+
     def test_used_keys_report_missing_locales_and_unknown_keys(self):
         self.assertEqual(self.report()['check2'], [])
         del self.orders['ar']['title']

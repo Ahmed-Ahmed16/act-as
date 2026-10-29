@@ -1,4 +1,5 @@
 import argparse
+import fnmatch
 import hashlib
 import json
 import re
@@ -90,9 +91,11 @@ def covers_path(entry, path):
 def mapped_pages(files, pages):
     touched = []
     for page, contents in pages:
-        paths = [row['path'] for row in files if page['covers_ok'] and any(
-            covers_path(entry, path) for entry in page['covers']
-            for path in (row['path'], row['old_path']))]
+        paths = [row['path'] for row in files if page['covers_ok'] and (
+            any(covers_path(entry, path) for entry in page['covers']
+                for path in (row['path'], row['old_path'])) or
+            any(path is not None and ('{' in entry or '}' in entry or fnmatch.fnmatchcase(path, entry))
+                for entry in page['covers_patterns'] for path in (row['path'], row['old_path'])))]
         if paths:
             touched.append((dict(page, files=paths), contents))
     return touched

@@ -91,7 +91,7 @@ def run_debate(pr_url, author, out_dir, skills_dir=None, list_path=None, env=Non
     scratch = tempfile.gettempdir() if tmp_dir is None else tmp_dir
     before = _worktree_entries(scratch)
     try:
-        completed = runner(command, capture_output=True, text=True)
+        completed = runner(command, capture_output=True, text=True, encoding='utf-8', errors='replace')
     except OSError as error:
         outcome['line'] = f'not checked: debate-review could not start: {error}'
     else:
@@ -100,7 +100,8 @@ def run_debate(pr_url, author, out_dir, skills_dir=None, list_path=None, env=Non
         outcome['exit_code'] = completed.returncode
         for stream in ('stdout', 'stderr'):
             path = output_folder / f'debate-{stream}.txt'
-            path.write_text(getattr(completed, stream), encoding='utf-8')
+            contents = getattr(completed, stream)
+            path.write_text(contents if isinstance(contents, str) else '', encoding='utf-8')
             outcome[f'{stream}_path'] = str(path)
         outcome['ran'] = True
         outcome['line'] = (f'not checked: debate-review failed, exit {completed.returncode}'

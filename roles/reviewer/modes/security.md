@@ -31,8 +31,11 @@ Before each step, run `cards.py reviewer security <step number>`, for example
    - `composer audit` on the head lock file.
    - gitleaks on the head files.
 
-   The scan folder holds the exact Git blobs. Export attributes cannot
-   omit or rewrite them. Composer advisories are counted from its JSON output.
+   The scan folder holds the exact Git blobs, except the PR's own scanner
+   settings: `.gitleaksignore` is removed, `config.audit` is removed from
+   `composer.json`, gitleaks uses a trusted config, and Semgrep ignores
+   `nosem` comments. Export attributes cannot omit or rewrite the other
+   files. Composer advisories are counted from its JSON output.
    Container rules, all of them:
    - Every container is named `actas-t33-<tool>-<pid>` and run with `--rm`.
    - The head files are mounted read only. Never mount the checkout, the home

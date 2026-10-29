@@ -27,7 +27,7 @@ class SplitPiecesTests(unittest.TestCase):
         self.inputs['split-plan.json']['groups'] = [
             dict(name='orchard', hunks=first), dict(name='grove', hunks=second)]
         body = f'group: orchard, {sizes[0]} counted lines\ngroup: grove, {sizes[1]} counted lines'
-        lines = ('size: fail, 10 counted lines\n## Split plan\n' + body +
+        lines = ('size: pass, 10 counted lines\n## Split plan\n' + body +
                  '\n## Drafts, not sent\n' + body).splitlines()
         return self.checker.split_failures(lines, self.inputs)
 

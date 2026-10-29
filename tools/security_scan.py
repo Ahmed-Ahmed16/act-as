@@ -46,18 +46,19 @@ FETCH = ("import pathlib,sys,urllib.request; "
          "[(pathlib.Path('/rules')/(r+'.yaml')).write_bytes(urllib.request.urlopen('https://semgrep.dev/c/r/'+r).read()) for r in sys.argv[1:]]")
 
 
-def redact(text):
+def redact(text, paths=False):
     text = SECRET.sub('[redacted]', ENV.sub(r"\1'[redacted]'", text))
-    for _, pattern in SCRUB_PATTERNS:
-        text = pattern.sub('[redacted]', text)
+    if not paths:
+        for _, pattern in SCRUB_PATTERNS:
+            text = pattern.sub('[redacted]', text)
     return text
 
 
-def redact_strings(document):
+def redact_strings(document, paths=False):
     if isinstance(document, str):
-        return redact(document)
+        return redact(document, paths=paths)
     if isinstance(document, list):
-        return [redact_strings(entry) for entry in document]
+        return [redact_strings(entry, paths=paths) for entry in document]
     if isinstance(document, dict):
         redacted = {}
         for key, entry in document.items():
@@ -67,7 +68,7 @@ def redact_strings(document):
             while masked_key in redacted or (masked_key != key and masked_key in document):
                 masked_key = f'{base_key}#{suffix}'
                 suffix += 1
-            redacted[masked_key] = redact_strings(entry)
+            redacted[masked_key] = redact_strings(entry, paths=key in ('path', 'files', 'paths', 'scanned'))
         return redacted
     return document
 
@@ -218,7 +219,7 @@ def semgrep(options, mounts, selected, runner):
             return unchecked('semgrep', 'rules fetch failed', fetch.returncode)
         completed = run(container('semgrep', mounts + [f'{rules}:/rules:ro']) +
             ['--network', 'none', '-e', 'SEMGREP_ENABLE_VERSION_CHECK=0', '-w', '/src', options.image,
-             'semgrep', 'scan', '--metrics=off', '--disable-version-check', '--config', '/rules', '--json', '--error', '--', *selected], runner)
+             'semgrep', 'scan', '--disable-nosem', '--metrics=off', '--disable-version-check', '--config', '/rules', '--json', '--error', '--', *selected], runner)
         stdout = raw_output(options.out, 'semgrep', completed)
         (options.out / 'semgrep-raw.json').write_text(redact_output(stdout), encoding='utf-8')
         if completed.returncode not in (0, 1):
@@ -260,8 +261,9 @@ def composer_audit(options, mounts, root, runner):
 
 
 def gitleaks(options, mounts, runner):
-    completed = run(container('gitleaks', mounts) + ['--network', 'none', options.image,
-                    'gitleaks', 'dir', '--no-banner', '--redact', '-v', '/src'], runner)
+    completed = run(container('gitleaks', mounts) + ['--network', 'none',
+                    '-e', 'GITLEAKS_CONFIG_TOML=[extend]\nuseDefault = true', options.image,
+                    'gitleaks', 'dir', '--ignore-gitleaks-allow', '--no-banner', '--redact', '-v', '/src'], runner)
     raw_output(options.out, 'gitleaks', completed)
     leaks = unchecked('gitleaks', f'exit {completed.returncode}', completed.returncode)
     if completed.returncode in (0, 1):
@@ -294,6 +296,21 @@ def export_head(repo, revision, root):
         target.write_bytes(git_bytes(repo, 'cat-file', 'blob', blob.decode('ascii')))
 
 
+def drop_head_scanner_config(root):
+    (root / '.gitleaksignore').unlink(missing_ok=True)
+    composer = root / 'composer.json'
+    if not composer.is_file():
+        return
+    try:
+        manifest = json.loads(composer.read_text(encoding='utf-8'))
+    except (json.JSONDecodeError, UnicodeError):
+        return
+    if isinstance(manifest, dict) and isinstance(manifest.get('config'), dict):
+        if 'audit' in manifest['config']:
+            del manifest['config']['audit']
+            composer.write_text(json.dumps(manifest) + '\n', encoding='utf-8', newline='\n')
+
+
 def tools(options, runner):
     selected = paths(options.files)
     options.out.mkdir(parents=True, exist_ok=True)
@@ -310,6 +327,7 @@ def tools(options, runner):
     with tempfile.TemporaryDirectory(prefix='actas-head-') as folder:
         root = Path(folder)
         export_head(options.repo, options.head, root)
+        drop_head_scanner_config(root)
         mounts = [f'{root}:/src:ro']
         scan = unchecked('semgrep', 'no changed files to scan')
         if selected:
