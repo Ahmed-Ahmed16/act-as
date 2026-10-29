@@ -284,10 +284,12 @@ def placeholder_gaps(values):
     groups, gaps = {}, []
     for entry in values:
         group = (entry['key'], entry['shape'], entry['file'])
-        groups.setdefault(group, {})[entry['locale']] = set(entry['placeholders']) - {':count'}
+        groups.setdefault(group, {})[entry['locale']] = {name for name in entry['placeholders']
+                                                       if name.lower() != ':count'}
     for (key, shape, filename), per_locale in groups.items():
-        all_names = set().union(*per_locale.values())
-        missing = sorted(locale for locale, names in per_locale.items() if all_names - names)
+        normalized = {locale: {name.lower() for name in names} for locale, names in per_locale.items()}
+        all_names = set().union(*normalized.values())
+        missing = sorted(locale for locale, names in normalized.items() if all_names - names)
         if len(per_locale) >= 2 and missing:
             gaps.append(dict(key=key, shape=shape, file=filename,
                              placeholders_by_locale={locale: sorted(names) for locale, names in per_locale.items()},
