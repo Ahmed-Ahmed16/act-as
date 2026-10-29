@@ -36,16 +36,16 @@ def verdict(options):
             raise ValueError('unknown area state: ' + area['state'])
     pending = [area for area in areas if area['state'] != 'pass']
     pending.sort(key=lambda area: area['state'] != 'fail')
+    draft_notice = 'rules page: draft, not in the repo yet'
+    passing = [f'area {area["area"]}: every rule kept'
+               + (', ' + draft_notice if draft_notice in area['reason'] else '')
+               for area in areas if area['state'] == 'pass']
     if not pending:
-        draft_notice = 'rules page: draft, not in the repo yet'
-        print('business: pass, ' + '; '.join(
-            f'area {area["area"]}: every rule kept'
-            + (', ' + draft_notice if draft_notice in area['reason'] else '')
-            for area in areas))
+        print('business: pass, ' + '; '.join(passing))
     else:
         state = 'fail' if pending[0]['state'] == 'fail' else 'incomplete'
         print(f'business: {state}, ' + '; '.join(
-            f'area {area["area"]}: {area["reason"]}' for area in pending))
+            [f'area {area["area"]}: {area["reason"]}' for area in pending] + passing))
     return 0
 
 

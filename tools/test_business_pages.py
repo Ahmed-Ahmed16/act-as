@@ -104,6 +104,48 @@ class BusinessPagesTests(unittest.TestCase):
         self.assertEqual(report['areas'][0]['files'], ['src/Glorp.php'])
         self.assertEqual(report['no_area_found'], [dict(path='src/Plim.php', old_path=None)])
 
+    def test_pattern_only_page_maps_matching_changes_as_incomplete(self):
+        self.page('p', '# P\n\nCovers: app/*.php\nChecked at: x\nR1. **match** foo\n')
+        self.default = self.base = self.commit()
+        self.write('app/B.php', 'content\n')
+        report = self.packet(self.commit())
+        self.assertEqual(len(report['areas']), 1)
+        area = report['areas'][0]
+        self.assertEqual((area['area'], area['files']), ('p', ['app/B.php']))
+        self.assertTrue(area['area_incomplete'])
+        self.assertIn('Covers entry is a pattern', area['not_checked'])
+        self.assertEqual(report['no_area_found'], [])
+
+    def test_patterns_match_old_paths_and_braces_fail_closed(self):
+        self.page('p', 'Covers: app/*.php\n')
+        self.page('brace', 'Covers: elsewhere/{x}.php\n')
+        self.write('app/B.php', 'unchanged\n' * 8)
+        self.default = self.base = self.commit()
+        self.write('config/x.yml', 'settings\n')
+        (self.repo / 'app/B.php').rename(self.repo / 'B.txt')
+        report = self.packet(self.commit())
+        areas = {area['area']: area['files'] for area in report['areas']}
+        self.assertEqual(areas, {'p': ['B.txt'], 'brace': ['B.txt', 'config/x.yml']})
+        self.assertEqual(report['no_area_found'], [])
+
+    def test_nonmatching_pattern_leaves_page_untouched(self):
+        self.page('p', 'Covers: app/*.php\n')
+        self.default = self.base = self.commit()
+        self.write('config/x.yml', 'settings\n')
+        report = self.packet(self.commit())
+        self.assertEqual(report['areas'], [])
+        self.assertEqual(report['no_area_found'], [dict(path='config/x.yml', old_path=None)])
+
+    def test_literal_cover_still_maps_when_a_pattern_does_not_match(self):
+        self.page('literal', 'Covers: app/\n')
+        self.page('mixed', 'Covers: app/, elsewhere/*.php\n')
+        self.default = self.base = self.commit()
+        self.write('app/B.php', 'content\n')
+        report = self.packet(self.commit())
+        self.assertEqual({area['area']: area['files'] for area in report['areas']},
+                         {'literal': ['app/B.php'], 'mixed': ['app/B.php']})
+        self.assertEqual(report['no_area_found'], [])
+
     def test_covers_patterns_are_reported_and_plain_entries_still_map(self):
         patterns = ['src/}glorp.php', 'src/{glorp.php', 'src/]glorp.php',
                     'src/[glorp.php', 'src/?.php', 'src/*.php']
@@ -118,17 +160,18 @@ class BusinessPagesTests(unittest.TestCase):
         self.assertEqual(area['not_checked'], ['Covers entry is a pattern'])
         self.assertTrue(area['covers_ok'])
         self.assertTrue(area['area_incomplete'])
-        self.assertEqual(area['files'], ['lib/Floop.php', 'src/Plim.php'])
-        self.assertEqual(report['no_area_found'], [dict(path='src/Glorp.php', old_path=None)])
+        self.assertEqual(area['files'], ['lib/Floop.php', 'src/Glorp.php', 'src/Plim.php'])
+        self.assertEqual(report['no_area_found'], [])
 
     def test_pattern_only_page_keeps_its_explanation_in_the_packet(self):
-        # G33: rejected patterns must survive even without a mapped file.
+        # G33: pattern warnings must survive when matching files map the area.
         self.page('zindle', 'Covers: app/*.php\n')
         self.default = self.base = self.commit()
         self.write('app/Glorp.php', 'floop\n')
         report = self.packet(self.commit())
-        self.assertEqual(report['areas'], [])
-        self.assertEqual(report['no_area_found'], [dict(path='app/Glorp.php', old_path=None)])
+        self.assertEqual([area['area'] for area in report['areas']], ['zindle'])
+        self.assertEqual(report['areas'][0]['files'], ['app/Glorp.php'])
+        self.assertEqual(report['no_area_found'], [])
         self.assertEqual(len(report.get('pages_with_patterns', [])), 1)
         page = report['pages_with_patterns'][0]
         self.assertEqual(page['area'], 'zindle')
@@ -138,7 +181,7 @@ class BusinessPagesTests(unittest.TestCase):
         self.assertTrue(page['area_incomplete'])
         self.assertEqual(page['files'], [])
         manifest = json.loads((self.out / 'rules-pages.json').read_text(encoding='utf-8'))
-        self.assertEqual(manifest['areas'], [])
+        self.assertEqual([area['area'] for area in manifest['areas']], ['zindle'])
 
     def test_path_boundaries_and_overlapping_pages(self):
         self.page('zindle', 'Covers: app/Loans, docs/, app/Vault.php\n')
@@ -153,11 +196,11 @@ class BusinessPagesTests(unittest.TestCase):
         report = self.packet(self.commit())
         mapped = {row['path']: row['areas'] for row in report['files']}
         self.assertEqual(mapped, {
-            paths[0]: ['floop', 'zindle'], paths[1]: [], paths[2]: ['zindle'],
-            paths[3]: [], paths[4]: ['zindle'], paths[5]: ['plim'], paths[6]: []})
+            paths[0]: ['floop', 'snorf', 'zindle'], paths[1]: ['snorf'], paths[2]: ['snorf', 'zindle'],
+            paths[3]: ['snorf'], paths[4]: ['zindle'], paths[5]: ['plim'], paths[6]: []})
         self.assertEqual(report['no_area_found'], [dict(path=path, old_path=None)
-                         for path in sorted([paths[1], paths[3], paths[6]])])
-        self.assertEqual(report['areas'][2]['files'], sorted([paths[0], paths[2], paths[4]]))
+                         for path in [paths[6]]])
+        self.assertEqual(report['areas'][3]['files'], sorted([paths[0], paths[2], paths[4]]))
 
     def test_renames_map_both_sides_and_deletion_maps(self):
         self.page('lending-and-returns', 'Covers: app/Loans/\n')
