@@ -1,3 +1,4 @@
+import re
 import shutil
 import subprocess
 import sys
@@ -285,6 +286,83 @@ class RealTesterRoleTests(unittest.TestCase):
                                      'explore common SKIPPED TST-514: mode code, site\n'
                                      'explore common SKIPPED TST-515: mode code, site\n'
                                      'total: 3 skipped\n')
+
+
+class RealReviewerRoleTests(unittest.TestCase):
+    # Reads the real role. Only the unreadable role check writes, in a temp tree.
+    modes = {'size': 29, 'business': 32, 'security': 33, 'health': 34, 'full': 39}
+    policy_ids = [f'REV-P{number:02d}' for number in range(1, 12)]
+
+    def setUp(self):
+        self.root = Path(__file__).resolve().parents[1]
+        self.role = self.root / 'roles/reviewer'
+
+    def run_gate(self, *args, root=None):
+        if root is None:
+            root = self.root
+        return subprocess.run([sys.executable, '-E', '-P', '-X', 'utf8', '-B',
+                               str(root / 'tools/cards.py'), *args],
+                              capture_output=True, text=True, encoding='utf-8', timeout=30)
+
+    def test_every_mode_reads_the_role_and_names_11_policy_cards(self):
+        role_file = self.role / 'ROLE.md'
+        self.assertTrue(role_file.is_file(), str(role_file))
+        bullets = '\n'.join(line for line in role_file.read_text(encoding='utf-8')
+                            .split('Cards for every mode:', 1)[0].splitlines()
+                            if line.startswith('- '))
+        self.assertEqual(re.findall(r'REV-P\d\d', bullets), self.policy_ids)
+        approved = sum('status: approved' in path.read_text(encoding='utf-8').splitlines()
+                       for card_id in self.policy_ids
+                       for path in [self.role / f'cards/{card_id}.md'] if path.is_file())
+        for mode in self.modes:
+            with self.subTest(mode=mode):
+                run = self.run_gate('reviewer', mode, 'policy')
+                self.assertEqual(run.returncode, 0 if approved == 11 else 3, run.stdout + run.stderr)
+                self.assertEqual(run.stdout.splitlines()[0],
+                                 f'cards.py reviewer {mode} policy: {approved} printed, {11 - approved} skipped')
+
+    def test_every_policy_card_file_exists_and_is_draft_or_approved(self):
+        for card_id in self.policy_ids:
+            with self.subTest(card_id=card_id):
+                path = self.role / f'cards/{card_id}.md'
+                self.assertTrue(path.is_file(), str(path))
+                lines = path.read_text(encoding='utf-8').splitlines()
+                statuses = [line.partition(':')[2].strip() for line in lines if line.startswith('status:')]
+                self.assertEqual(len(statuses), 1, str(path))
+                self.assertIn(statuses[0], ['draft', 'approved'], str(path))
+                self.assertEqual([line for line in lines if line.startswith('id:')], [f'id: {path.stem}'])
+
+    def test_audit_on_the_scaffolds_is_exact(self):
+        run = self.run_gate('reviewer', '--audit')
+        self.assertEqual(run.returncode, 0, run.stderr)
+        # Change this string when step or common cards are routed into the modes.
+        self.assertEqual(run.stdout, 'total: 0 skipped\n')
+
+    def test_each_mode_scaffold_has_a_steps_heading_and_its_filled_by_line(self):
+        for mode, ticket in self.modes.items():
+            with self.subTest(mode=mode):
+                path = self.role / f'modes/{mode}.md'
+                self.assertTrue(path.is_file(), str(path))
+                text = path.read_text(encoding='utf-8')
+                self.assertIn('## Steps', text.splitlines())
+                self.assertRegex(text.lower(), rf'(?m)^1\. [^\n]*filled by ticket {ticket}\b')
+
+    def test_unreadable_reviewer_role_file_turns_the_role_off(self):
+        self.assertTrue(self.role.is_dir(), str(self.role))
+        with tempfile.TemporaryDirectory(prefix='actas-reviewer-') as tree:
+            root = Path(tree)
+            (root / 'tools').mkdir()
+            shutil.copyfile(self.root / 'tools/cards.py', root / 'tools/cards.py')
+            role = root / 'roles/reviewer'
+            shutil.copytree(self.role, role)
+            role_file = role / 'ROLE.md'
+            role_file.unlink()
+            role_file.mkdir()
+            run = self.run_gate('reviewer', 'size', 'policy', root=root)
+            self.assertEqual(run.returncode, 2, run.stdout + run.stderr)
+            self.assertEqual(run.stdout, '')
+            self.assertEqual(len(run.stderr.splitlines()), 1)
+            self.assertNotIn('Traceback', run.stderr)
 
 
 if __name__ == '__main__':

@@ -20,3 +20,5 @@ jobs:
       - run: python -m unittest discover -s tools -p 'test_*.py' -v
       # Audit the real tester cards through the card gate.
       - run: python tools/cards.py tester --audit
+      # Audit the reviewer cards through the card gate. The unit tests cover its policy cards.
+      - run: python tools/cards.py reviewer --audit

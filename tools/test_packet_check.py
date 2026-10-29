@@ -6,6 +6,11 @@ import tempfile
 import unittest
 from pathlib import Path
 
+if __package__:
+    from .packet_check import bad_verdicts
+else:
+    from packet_check import bad_verdicts
+
 
 FAILED_SHAPE = 1
 HEADINGS = ['Behaviour changed', 'Files that matter most', 'Tests run',
@@ -14,11 +19,13 @@ MONEY_NO = 'no money code found by reading; not proof'
 MONEY_YES = ('yes, files cart.py. Needs the separate Opus review before merge. '
              'Not done by this review.')
 CAP_LINE = "reviewed over the cap, on Ahmed's word"
+STOP = 'not checked: PR over the cap, split it first'
+HEAD = 'a' * 40
 
 
 def good_packet():
     bodies = ['The cart shows ___ (tax) after a country change.',
-              'cart.py reads the country.', 'python -m unittest passed.',
+              'cart.py reads the country.', f'CI run 12, commit {HEAD}, result pass.',
               '___ (tax): The owner has not supplied the tax rule.',
               'none', 'none', 'not needed: The change fits together.',
               'Draft: Ask the owner for the tax rule.']
@@ -36,6 +43,21 @@ def replace_body(packet, heading, body):
     before, rest = packet.split(f'## {heading}\n', 1)
     _, separator, after = rest.partition('\n## ')
     return before + f'## {heading}\n{body}\n' + separator + after
+
+
+def replace_line(packet, field, body):
+    line = next(line for line in packet.splitlines() if line.startswith(field + ':'))
+    return packet.replace(line, field + ': ' + body)
+
+
+def single_packet(mode='business'):
+    packet = good_packet().replace('mode=full', 'mode=' + mode)
+    for field in ['size', 'business', 'security', 'health']:
+        if field != mode:
+            packet = replace_line(packet, field, f'not asked: {mode} run only')
+    if mode != 'security':
+        packet = replace_line(packet, 'money', f'not checked: money not looked at, {mode} run only')
+    return packet
 
 
 def good_inputs():
@@ -88,8 +110,279 @@ class PacketCheckTests(unittest.TestCase):
             dict(name='grove', entry_points=['grove.py'], estimate=50, hunks=['h2'])]
         self.write_inputs()
         groups = 'group: orchard, 70 counted lines\ngroup: grove, 50 counted lines'
-        packet = replace_body(good_packet(), 'Split plan', groups)
+        packet = replace_body(single_packet(), 'Split plan', groups)
         return replace_body(packet, 'Drafts, not sent', groups)
+
+    def short_packet(self):
+        packet = self.split_packet().replace('mode=business', 'mode=full')
+        packet = replace_line(packet, 'size', 'fail, 120 counted lines')
+        for field in ['business', 'security', 'health', 'money']:
+            packet = replace_line(packet, field, STOP)
+        for heading in HEADINGS[1:6]:
+            packet = replace_body(packet, heading, STOP)
+        return replace_body(packet, 'Behaviour changed', 'orchard changes.\ngrove changes.')
+
+    def override_packet(self):
+        return CAP_LINE + '\n' + replace_line(good_packet(), 'size', 'fail, 120 counted lines')
+
+    def rerun_packet(self):
+        packet = replace_line(good_packet(), 'business', 'pass, orchard rebuilt')
+        return f'business rerun for orchard, 2026-10-26, head {HEAD}\n' + packet
+
+    def assert_rules(self, packet, *rules):
+        run = self.check_text(packet)
+        self.assertEqual(run.returncode, FAILED_SHAPE, run.stderr + run.stdout)
+        self.assertEqual(run.stderr, '')
+        lines = run.stdout.splitlines()
+        self.assertTrue(all(line.startswith('RULE ') and ': ' in line for line in lines), lines)
+        self.assertCountEqual([line.split(':', 1)[0][5:] for line in lines], rules)
+
+    # Cases: each packet type, absent counts, wrong head, empty fields,
+    # wrong mode words, misplaced cap, missing areas, and rerun security words.
+    # Removing a named exception must fail the corresponding CLI test.
+    def test_short_packet_passes(self):
+        self.assert_pass(self.short_packet())
+
+    def test_single_mode_packet_passes(self):
+        self.inputs['check-record.json']['entries'] = self.inputs['check-record.json']['entries'][-2:]
+        self.write_inputs()
+        self.assert_pass(single_packet())
+
+    def test_single_size_over_cap_not_asked_passes(self):
+        packet = replace_line(single_packet('size'), 'size', 'fail, 120 counted lines')
+        self.assert_pass(replace_body(packet, 'Split plan', 'not asked: size run only'))
+
+    def test_single_size_over_cap_not_checked_passes(self):
+        packet = replace_line(single_packet('size'), 'size', 'fail, 120 counted lines')
+        for field in ['business', 'security', 'health']:
+            packet = replace_line(packet, field, STOP)
+        self.assert_pass(replace_body(packet, 'Split plan', 'not asked: size run only'))
+
+    # Cases: exact stop text, other plan text, groups in either body,
+    # absent or repeated placements, empty drafts, and other packet modes.
+    def test_single_size_over_cap_pass_verdicts_fail_single_mode_line(self):
+        packet = replace_line(single_packet('size'), 'size', 'fail, 120 counted lines')
+        packet = replace_body(packet, 'Split plan', 'not asked: size run only')
+        for field in ['business', 'security', 'health']:
+            packet = replace_line(packet, field, 'pass')
+        self.assert_rules(packet, 'single-mode-line')
+
+    def test_single_size_over_cap_groups_in_plan_fail_both_size_rules(self):
+        split = self.split_packet()
+        packet = replace_line(single_packet('size'), 'size', 'fail, 120 counted lines')
+        groups = split.split('## Split plan\n', 1)[1].split('\n## ', 1)[0].strip()
+        packet = replace_body(packet, 'Split plan', groups)
+        for draft, extra_rules in [(groups, []), ('Draft: Ask about orchard.', ['split-message'])]:
+            with self.subTest(draft=draft):
+                self.assert_rules(replace_body(packet, 'Drafts, not sent', draft),
+                                  'size-split-plan', 'size-no-draft', *extra_rules)
+
+    def test_single_size_over_cap_groups_in_drafts_fail_size_no_draft(self):
+        packet = replace_line(single_packet('size'), 'size', 'fail, 120 counted lines')
+        packet = replace_body(packet, 'Split plan', 'not asked: size run only')
+        for prefix in ['', '  ', '- ', '* ']:
+            with self.subTest(prefix=prefix):
+                self.assert_rules(replace_body(packet, 'Drafts, not sent',
+                                              prefix + 'group: orchard, 70 counted lines'),
+                                  'split-message', 'size-no-draft')
+
+    def test_single_size_over_cap_other_plan_text_fails_size_split_plan(self):
+        self.inputs['split-plan.json']['unplaced'] = ['h1', 'h2']
+        self.write_inputs()
+        packet = replace_line(single_packet('size'), 'size', 'fail, 120 counted lines')
+        for body in ['not needed: x', 'Separate cart changes.',
+                     'not asked: business run only', 'not asked: size run only\nExtra text.']:
+            with self.subTest(body=body):
+                self.assert_rules(replace_body(packet, 'Split plan', body), 'size-split-plan')
+
+    def test_single_size_over_cap_skips_duplicate_and_unplaced_hunks(self):
+        self.inputs['split-plan.json']['unplaced'] = ['h1', 'h1']
+        self.write_inputs()
+        packet = replace_line(single_packet('size'), 'size', 'fail, 120 counted lines')
+        self.assert_pass(replace_body(packet, 'Split plan', 'not asked: size run only'))
+
+    def test_other_packets_not_asked_plan_still_checks_hunks(self):
+        for mode in ['size', 'business']:
+            with self.subTest(mode=mode):
+                packet = replace_body(single_packet(mode), 'Split plan', 'not asked: size run only')
+                self.assert_rules(packet, 'hunk-unplaced')
+
+    def test_single_size_over_cap_drafts_still_need_content(self):
+        packet = replace_line(single_packet('size'), 'size', 'fail, 120 counted lines')
+        packet = replace_body(packet, 'Split plan', 'not asked: size run only')
+        self.assert_rules(replace_body(packet, 'Drafts, not sent', ''), 'missing-part')
+
+    def test_rerun_packet_passes(self):
+        self.assert_pass(self.rerun_packet())
+
+    def test_full_size_counts_missing(self):
+        self.assert_rules(replace_line(good_packet(), 'size', 'pass'), 'full-size-counts')
+
+    def test_full_line_forbids_not_asked_and_security_health_not_checked(self):
+        for field, word in [('size', 'not asked'), ('business', 'not asked'),
+                            ('security', 'not checked'), ('health', 'not checked')]:
+            with self.subTest(field=field, word=word):
+                self.assert_rules(replace_line(good_packet(), field, word), 'full-line')
+
+    def test_full_business_not_checked_passes(self):
+        self.assert_pass(replace_line(good_packet(), 'business', 'not checked: rules page unavailable'))
+
+    def test_full_tests_run_other_commit(self):
+        for body in [f'CI run 12, commit {"b" * 40}, result pass.',
+                     f'CI run 12, commits {HEAD}, {"b" * 40}, result pass.']:
+            with self.subTest(body=body):
+                self.assert_rules(replace_body(good_packet(), 'Tests run', body), 'full-tests-run')
+
+    def test_full_tests_run_id_and_result_syntax_not_assumed(self):
+        self.assert_pass(replace_body(good_packet(), 'Tests run', 'CI run 12, result pass.'))
+
+    def test_full_tests_run_missing(self):
+        self.assert_rules(replace_body(good_packet(), 'Tests run', ''), 'missing-part')
+
+    def test_full_tests_run_no_ci_other_head(self):
+        packet = replace_body(good_packet(), 'Tests run', 'not checked: no CI run on head ' + 'b' * 40)
+        self.assert_rules(packet, 'full-tests-run')
+
+    def test_full_no_ci_on_head_passes(self):
+        self.assert_pass(replace_body(good_packet(), 'Tests run', 'not checked: no CI run on head ' + HEAD))
+
+    def test_full_money_invalid(self):
+        self.assert_rules(replace_line(good_packet(), 'money', 'no'), 'money-line', 'full-money')
+
+    def test_full_split_plan_not_not_needed(self):
+        packet = self.split_packet()
+        packet = replace_line(packet, 'money', MONEY_NO).replace('mode=business', 'mode=full')
+        for field in ['size', 'security', 'health']:
+            original = next(line for line in good_packet().splitlines() if line.startswith(field + ':'))
+            packet = replace_line(packet, field, original.split(': ', 1)[1])
+        self.assert_rules(packet, 'full-split-plan')
+
+    def test_override_cap_line_missing_cross_size_fail(self):
+        self.assert_rules(self.override_packet().replace(CAP_LINE + '\n', ''), 'cross-size-fail')
+
+    def test_override_size_not_fail(self):
+        self.assert_rules(CAP_LINE + '\n' + good_packet(), 'override-size-fail')
+
+    def test_override_size_counts_missing(self):
+        self.assert_rules(replace_line(self.override_packet(), 'size', 'fail'), 'full-size-counts')
+
+    def test_override_cap_line_after_identity(self):
+        self.assert_rules(replace_line(good_packet(), 'size', 'fail, 120 counted lines') + CAP_LINE + '\n',
+                          'override-cap-line', 'cross-size-fail')
+
+    def test_override_not_checked_over_cap(self):
+        self.assert_rules(replace_line(self.override_packet(), 'business', STOP), 'override-not-checked')
+
+    def test_short_line_money_not_checked_missing(self):
+        self.assert_rules(replace_line(self.short_packet(), 'money', MONEY_NO), 'short-line')
+
+    def test_short_line_tests_run_not_checked_missing(self):
+        self.assert_rules(replace_body(self.short_packet(), 'Tests run', 'CI run 12'), 'short-line')
+
+    def test_short_line_known_risks_not_checked_missing(self):
+        self.assert_rules(replace_body(self.short_packet(), 'Known risks', 'none'), 'short-line')
+
+    def test_short_behaviour_fewer_lines_than_groups(self):
+        self.assert_rules(replace_body(self.short_packet(), 'Behaviour changed', 'orchard changes.'),
+                          'short-behaviour')
+
+    def test_short_size_counts_missing(self):
+        self.assert_rules(replace_line(self.short_packet(), 'size', 'fail'), 'short-size-counts')
+
+    def test_short_split_plan_missing(self):
+        self.assert_rules(replace_body(self.short_packet(), 'Split plan', ''),
+                          'missing-part', 'split-field', 'short-split-plan')
+
+    def test_short_draft_missing(self):
+        self.assert_rules(replace_body(self.short_packet(), 'Drafts, not sent', ''),
+                          'missing-part', 'split-message', 'short-draft')
+
+    def test_single_mode_line_asked_word_outside_table(self):
+        self.assert_rules(replace_line(single_packet('health'), 'health', 'not checked'),
+                          'single-mode-line')
+
+    def test_single_mode_line_other_mode_not_not_asked(self):
+        self.assert_rules(replace_line(single_packet(), 'health', 'pass'), 'single-mode-line')
+
+    def test_single_size_non_size_has_counts(self):
+        self.assert_rules(replace_line(single_packet(), 'size', 'pass, 120 counted lines'), 'single-size')
+
+    def test_single_size_asked_counts_missing(self):
+        packet = replace_line(single_packet('size'), 'size', 'fail')
+        self.assert_rules(replace_body(packet, 'Split plan', 'not asked: size run only'), 'single-size')
+
+    def test_single_money_breaks_q2a(self):
+        self.assert_rules(replace_line(single_packet(), 'money', MONEY_NO), 'single-money')
+
+    def test_single_tests_run_outside_forms(self):
+        self.assert_rules(replace_body(single_packet(), 'Tests run', 'not asked: health run only'),
+                          'single-tests-run')
+
+    def test_single_tests_run_normal_o17_passes(self):
+        self.assert_pass(single_packet())
+
+    def test_single_tests_run_not_asked_o17_passes(self):
+        self.assert_pass(replace_body(single_packet(), 'Tests run', 'not asked: business run only'))
+
+    def test_single_tests_run_no_ci_on_head_passes(self):
+        self.assert_pass(replace_body(single_packet(), 'Tests run', 'not checked: no CI run on head ' + HEAD))
+
+    def test_single_security_money_forms_pass(self):
+        for money in [MONEY_NO, MONEY_YES, 'not checked: files unavailable']:
+            with self.subTest(money=money):
+                self.assert_pass(replace_line(single_packet('security'), 'money', money))
+
+    def test_single_health_and_size_without_security_record_pass(self):
+        self.inputs['check-record.json']['entries'] = self.inputs['check-record.json']['entries'][-2:]
+        self.write_inputs()
+        for mode in ['health', 'size']:
+            with self.subTest(mode=mode):
+                self.assert_pass(single_packet(mode))
+
+    def test_cross_size_fail_other_lines_checked(self):
+        self.assert_rules(replace_line(good_packet(), 'size', 'fail, 120 counted lines'), 'cross-size-fail')
+
+    def test_rerun_line_missing_with_business_rerun_claim(self):
+        packet = replace_line(good_packet(), 'business', 'pass, business rerun rebuilt orchard')
+        self.assert_rules(packet, 'rerun-line')
+
+    def test_rerun_line_bad_shape_date_head_or_area(self):
+        packet = self.rerun_packet()
+        line = packet.splitlines()[0]
+        for bad in [line + ' extra', line.replace('2026-10-26', '2026-02-30'),
+                    line.replace(HEAD, 'b' * 40), line.replace('orchard', 'grove')]:
+            with self.subTest(line=bad):
+                self.assert_rules(packet.replace(line, bad), 'rerun-line')
+
+    def test_rerun_business_missing_touched_area(self):
+        packet = self.rerun_packet()
+        self.inputs['rules-pages.json']['areas'].append(dict(area='grove', page='grove.md',
+                                                           commit='e' * 40, rules=[]))
+        self.write_inputs()
+        self.assert_rules(packet, 'rerun-business')
+
+    def test_rerun_business_area_case_matters(self):
+        self.assert_rules(replace_line(self.rerun_packet(), 'business', 'pass, Orchard rebuilt'),
+                          'rerun-business')
+
+    def test_rerun_security_pass_with_incomplete_record(self):
+        self.inputs['check-record.json']['entries'][0]['word'] = 'incomplete'
+        self.write_inputs()
+        self.assert_rules(self.rerun_packet(), 'rerun-security')
+
+    def test_rerun_security_fail_turned_incomplete(self):
+        self.inputs['check-record.json']['entries'][0]['word'] = 'must fix'
+        self.write_inputs()
+        self.assert_rules(replace_line(self.rerun_packet(), 'security', 'incomplete'),
+                          'security-line', 'rerun-security')
+
+    def test_rerun_security_not_asked_or_not_checked_stays(self):
+        self.inputs['check-record.json']['entries'][0]['word'] = 'incomplete'
+        self.write_inputs()
+        packet = single_packet().replace('business: incomplete', 'business: incomplete, orchard')
+        self.assert_pass(f'business rerun for orchard, 2026-10-26, head {HEAD}\n' + packet)
+        packet = replace_line(self.short_packet(), 'business', STOP + ', orchard')
+        self.assert_pass(f'business rerun for orchard, 2026-10-26, head {HEAD}\n' + packet)
 
     def run_check(self, *args):
         return subprocess.run([sys.executable, '-E', '-P', '-X', 'utf8', '-B',
@@ -106,17 +399,17 @@ class PacketCheckTests(unittest.TestCase):
         self.assertEqual(run.stdout, 'packet_check: pass\n')
         self.assertEqual(run.stderr, '')
 
-    def assert_rule(self, packet, rule, message):
+    def assert_rule(self, packet, rule, message, *extra_lines):
         run = self.check_text(packet)
         self.assertEqual(run.returncode, FAILED_SHAPE, run.stderr + run.stdout)
-        self.assertEqual(run.stdout.splitlines(), [f'RULE {rule}: {message}'])
+        self.assertEqual(run.stdout.splitlines(), [f'RULE {rule}: {message}', *extra_lines])
         self.assertEqual(run.stderr, '')
 
-    def test_good_packet_passes(self):
+    def test_full_packet_passes(self):
         self.assert_pass(good_packet())
 
-    def test_good_packet_with_cap_line_passes(self):
-        self.assert_pass(CAP_LINE + '\n' + good_packet())
+    def test_override_packet_passes(self):
+        self.assert_pass(self.override_packet())
 
     def test_headings_missing_duplicate_or_out_of_order(self):
         packet = good_packet()
@@ -161,7 +454,8 @@ class PacketCheckTests(unittest.TestCase):
             for word in words:
                 for ending in ['', ', reason', ': reason', '; reason', '. reason', ' reason']:
                     with self.subTest(field=field, word=word, ending=ending):
-                        self.assert_pass(good_packet().replace(line, field + ': ' + word + ending))
+                        packet = good_packet().replace(line, field + ': ' + word + ending)
+                        self.assertEqual(bad_verdicts(packet.splitlines()), [])
 
     def test_money_line_rejects_bad_or_missing_forms(self):
         for money in ['', 'does not apply', 'not checked:',
@@ -169,7 +463,8 @@ class PacketCheckTests(unittest.TestCase):
             with self.subTest(money=money):
                 bad = good_packet().replace('money: ' + MONEY_NO,
                                              'money: ' + money if money else '')
-                self.assert_rule(bad, 'money-line', 'missing or invalid money line')
+                self.assert_rule(bad, 'money-line', 'missing or invalid money line',
+                                 'RULE full-money: missing or invalid money line')
 
     def test_money_forms_pass(self):
         for money in [MONEY_NO, MONEY_YES, 'not checked: The cart files were unavailable.']:
@@ -198,7 +493,7 @@ class PacketCheckTests(unittest.TestCase):
                 self.assert_pass(replace_body(good_packet(), heading, 'none found after reading'))
         self.inputs['split-plan.json']['unplaced'] = ['h1', 'h2']
         self.write_inputs()
-        self.assert_pass(replace_body(good_packet(), 'Split plan', 'Separate cart and account changes.'))
+        self.assert_pass(replace_body(single_packet(), 'Split plan', 'Separate cart and account changes.'))
 
     def test_split_plan_not_needed_requires_a_reason_g6(self):
         # Boundaries: empty, spaces, tabs, newlines, and a real reason.
@@ -263,7 +558,7 @@ class PacketCheckTests(unittest.TestCase):
         self.assert_pass(good_packet() + 'The cart is ready for another review.\n')
 
     def test_cap_contradiction_rejects_both_statements(self):
-        self.assert_rule(CAP_LINE + '\n' + good_packet() + 'It was not reviewed past size\n',
+        self.assert_rule(self.override_packet() + 'It was not reviewed past size\n',
                          'cap-contradiction', 'cap review contradicts size stop')
         self.assert_pass(good_packet() + 'It was not reviewed past size\n')
 
@@ -284,7 +579,8 @@ class PacketCheckTests(unittest.TestCase):
                     entry for entry in good_inputs()['check-record.json']['entries']
                     if entry['id'] not in ['S1', 'S22', 'L5']]
                 self.write_inputs()
-                self.assert_rule(good_packet().replace('mode=full', 'mode=' + mode),
+                packet = good_packet() if mode == 'full' else single_packet(mode)
+                self.assert_rule(packet,
                                  'check-record-id', 'missing ids: S1, S22, L5')
 
     def test_bad_packet_check_record_tool(self):
@@ -366,7 +662,7 @@ class PacketCheckTests(unittest.TestCase):
     def test_required_ids_apply_without_built_in_security_ids(self):
         self.inputs['check-record.json']['entries'] = self.inputs['check-record.json']['entries'][-2:]
         self.write_inputs()
-        packet = good_packet().replace('mode=full', 'mode=business')
+        packet = single_packet()
         self.assert_pass(packet)
         self.inputs['check-record.json']['required_ids'].append('C1')
         self.write_inputs()
@@ -391,7 +687,7 @@ class PacketCheckTests(unittest.TestCase):
         self.assert_pass(packet.replace('group: grove, 50', 'group: grove, 0'))
 
     def test_hunk_counts_skips_size_without_count(self):
-        self.assert_pass(good_packet().replace('size: pass, 120 counted lines', 'size: not asked'))
+        self.assert_pass(single_packet())
 
     def test_json_input_errors_precede_packet_rules(self):
         for filename in self.inputs:

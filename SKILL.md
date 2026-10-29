@@ -1,6 +1,6 @@
 ---
 name: act-as
-description: Put on a working role (tester, developer, manager) with its rules, tools, never list and finish checklist. Usage: /act-as tester (Claude Code) or $act-as tester (Codex)
+description: Put on a working role (tester, developer, manager, reviewer) with its rules, tools, never list and finish checklist. Usage: /act-as tester (Claude Code) or $act-as tester (Codex)
 disable-model-invocation: true
 ---
 
@@ -17,6 +17,7 @@ or names another role.
 | tester | `roles/tester/ROLE.md` | v1 |
 | developer | `roles/developer/ROLE.md` | v1.1, switch test passed 2026-10-19 |
 | manager | `roles/manager/ROLE.md` | v1.2, refuses to fix 6 of 6 (2026-10-20); status page 4 of 4 after PR 12 (2026-10-22) |
+| reviewer | `roles/reviewer/ROLE.md` | draft, not proven |
 
 ## Steps
 

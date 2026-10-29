@@ -42,13 +42,39 @@ Missing entry fields exit 1, using input-fields if no other rule fails.
 Full and security identity modes require S1 through S22, L1, L5 plus required_ids.
 Record checks precede hunk checks and exact ordered group line comparisons.
 Only counted file hunks contribute lines. Unknown hunk ids contribute 0.
-Hunk placement checks apply unless Split plan starts with not needed.
+Hunk placement checks skip not needed and size mode fail with not asked.
+
+Packet types add rules to these common checks. Full packets need size
+counts, Tests run tied to the head, a money form above, and not needed
+in Split plan. Security and health cannot say not checked in full packets.
+An override needs the exact cap line above the identity, size fail with
+counts, and no verdict saying not checked because of the cap.
+Short packets have size fail with counts and the cap stop text in the
+other verdicts, money, and fields except Behaviour changed, Split plan,
+and Drafts, not sent. Behaviour changed needs at least 1 line per group.
+The split plan and draft must contain group lines.
+Single mode packets mark other modes not asked: <mode> run only.
+Only an asked size line has counts. A size fail also allows the cap stop
+text in the other verdicts. Money outside security says
+not checked: money not looked at, <mode> run only. Tests run also allows
+not asked: <mode> run only. Size fail without cap stop verdicts requires
+the cap line unless mode is size.
+In size mode, fail needs Split plan exactly not asked: size run only.
+That case forbids group lines in Split plan and Drafts, not sent.
+Tests run rejects any 40 hex commit other than the head. The exact
+not checked: no CI run on head <sha> form must name that head.
+CI run id and result syntax are not defined, so they are not checked.
+A business rerun line needs a known area, an ISO date, and the head.
+A business line claiming business rerun also requires that line.
+Rerun business verdicts name every rules page area. Security must fix
+still requires fail; an incomplete security entry cannot leave pass.
 """
 
 import json
 import re
 import sys
 from collections import Counter
+from datetime import date
 from pathlib import Path
 
 FAILED_SHAPE = 1
@@ -60,6 +86,8 @@ IDENTITY = {'repo': r'[^/\s;]+/[^/\s;]+', 'pr': r'[0-9]+',
             'head': HEX, 'base': HEX, 'default': r'[^\s;@]+@' + HEX,
             'date': r'[0-9]{4}-[0-9]{2}-[0-9]{2}'}
 CAP_LINE = "reviewed over the cap, on Ahmed's word"
+CAP_STOP = 'not checked: PR over the cap, split it first'
+GROUP_LINE = r'^[ \t]*(?:[-*] )?group: (.+), ([0-9]+) counted lines[ \t]*$'
 UNKNOWN = re.compile(r'___[ \t]*\(([^()\n]+)\)')
 NO_REASON = {'___', 'unknown', 'not checked', 'not checked:'}
 MONEY_END = '. Needs the separate Opus review before merge. Not done by this review.'
@@ -158,7 +186,12 @@ def split_failures(lines, inputs):
     placements.update(plan['unplaced'])
     bodies = field_bodies(lines)
     failures = []
-    if not bodies.get('Split plan', '').startswith('not needed'):
+    size_over_cap = (any(re.search(r'(?:^|;)\s*mode=size\s*(?:;|$)', identity)
+                         for identity in line_values(lines, 'identity')[:1]) and
+                     any(verdict_word(verdict) == 'fail' for verdict in line_values(lines, 'size')[:1]))
+    split_body = bodies.get('Split plan', '')
+    if not (split_body.startswith('not needed') or
+            (size_over_cap and split_body.startswith('not asked'))):
         missing = [str(key) for key in counts if key not in placements]
         duplicates = [str(key) for key, count in placements.items() if count > 1]
         if missing:
@@ -173,8 +206,7 @@ def split_failures(lines, inputs):
                 for group in groups]
     for rule, heading in [('split-field', 'Split plan'), ('split-message', 'Drafts, not sent')]:
         actual = [(match[1], int(match[2])) for match in re.finditer(
-            r'^[ \t]*(?:[-*] )?group: (.+), ([0-9]+) counted lines[ \t]*$',
-            bodies.get(heading, ''), re.MULTILINE)]
+            GROUP_LINE, bodies.get(heading, ''), re.MULTILINE)]
         if actual != expected:
             failures.append((rule, 'group lines differ from split-plan.json'))
     return failures
@@ -307,6 +339,154 @@ def rule_failures(text):
     return failures
 
 
+def verdict_word(verdict):
+    match = re.match(r'(not asked|not checked|pass|fail|incomplete)(?=$|[,:;. ])', verdict)
+    return match[1] if match else ''
+
+
+def has_size_counts(verdict):
+    return bool(re.search(r'\b[0-9]+\s+counted lines\b', verdict))
+
+
+def tests_on_head(body, head):
+    if body.startswith('not checked:'):
+        match = re.fullmatch(r'not checked: no CI run on head (' + HEX + ')', body)
+        return bool(match and match[1].lower() == head.lower())
+    if body.startswith('not asked'):
+        return False
+    return all(commit.lower() == head.lower() for commit in re.findall(r'\b' + HEX + r'\b', body))
+
+
+def full_failures(verdicts, bodies, head):
+    failures = []
+    forbidden = [field for field in ['size', 'business', 'security', 'health']
+                 if verdict_word(verdicts[field]) == 'not asked' or
+                 (field in ['security', 'health'] and verdict_word(verdicts[field]) == 'not checked')]
+    if forbidden:
+        failures.append(('full-line', 'words not allowed in full packets: ' + ', '.join(forbidden)))
+    if verdict_word(verdicts['size']) in ['pass', 'fail'] and not has_size_counts(verdicts['size']):
+        failures.append(('full-size-counts', 'size needs counted lines'))
+    missing = missing_parts(bodies)
+    tests = bodies.get('Tests run', '')
+    if tests and 'Tests run' not in missing and not tests_on_head(tests, head):
+        failures.append(('full-tests-run', 'Tests run must name the PR head'))
+    if not valid_money(verdicts['money']):
+        failures.append(('full-money', 'missing or invalid money line'))
+    plan = bodies.get('Split plan', '')
+    if plan and 'Split plan' not in missing and not re.match(r'not needed(?=$|:)', plan):
+        failures.append(('full-split-plan', 'Split plan must say not needed'))
+    return failures
+
+
+def short_failures(verdicts, bodies, plan):
+    failures = []
+    if not has_size_counts(verdicts['size']):
+        failures.append(('short-size-counts', 'size needs counted lines'))
+    stopped = [verdicts['money'], *(bodies.get(heading, '') for heading in HEADINGS[1:6])]
+    if any(body != CAP_STOP for body in stopped):
+        failures.append(('short-line', 'short packet fields must say ' + CAP_STOP))
+    behaviour = [line for line in bodies.get('Behaviour changed', '').splitlines() if line.strip()]
+    if len(behaviour) < len(plan['groups']):
+        failures.append(('short-behaviour', 'Behaviour changed needs at least 1 line per split group'))
+    for rule, heading in [('short-split-plan', 'Split plan'), ('short-draft', 'Drafts, not sent')]:
+        if not plan['groups'] or not re.search(r'^(?:[-*] )?group: ', bodies.get(heading, ''), re.MULTILINE):
+            failures.append((rule, heading + ' needs split groups'))
+    return failures
+
+
+def single_failures(verdicts, bodies, identity):
+    failures = []
+    mode, head = identity['mode'], identity['head']
+    not_asked = f'not asked: {mode} run only'
+    size = verdicts['size']
+    over_cap = mode == 'size' and verdict_word(size) == 'fail'
+    if over_cap:
+        if bodies.get('Split plan', '') != not_asked:
+            failures.append(('size-split-plan', 'Split plan must say ' + not_asked))
+        if any(re.search(GROUP_LINE, bodies.get(heading, ''), re.MULTILINE)
+               for heading in ['Split plan', 'Drafts, not sent']):
+            failures.append(('size-no-draft', 'size run only forbids split group lines'))
+    allowed = ['pass', 'fail', 'incomplete'] + (['not checked'] if mode == 'business' else [])
+    bad = [field for field in ['business', 'security', 'health']
+           if (field == mode and verdict_word(verdicts[field]) not in allowed) or
+           (field != mode and verdicts[field] != not_asked and
+            not (over_cap and verdicts[field] == CAP_STOP))]
+    if bad:
+        failures.append(('single-mode-line', 'wrong mode words: ' + ', '.join(bad)))
+    if ((mode == 'size' and (verdict_word(size) not in ['pass', 'fail'] or not has_size_counts(size))) or
+            (mode != 'size' and size != not_asked)):
+        failures.append(('single-size', 'size needs counts when asked, otherwise ' + not_asked))
+    money = verdicts['money']
+    if ((mode == 'security' and not valid_money(money)) or
+            (mode != 'security' and money != f'not checked: money not looked at, {mode} run only')):
+        failures.append(('single-money', 'money must follow the ' + mode + ' run form'))
+    tests = bodies.get('Tests run', '')
+    if (tests and 'Tests run' not in missing_parts(bodies) and
+            tests != not_asked and not tests_on_head(tests, head)):
+        failures.append(('single-tests-run', 'Tests run needs the head or ' + not_asked))
+    return failures
+
+
+def rerun_failures(lines, inputs, identity):
+    reruns = [line for line in lines if line.lstrip().startswith('business rerun')]
+    business = ' '.join(line_values(lines, 'business'))
+    if not reruns:
+        return [('rerun-line', 'business rerun claim needs a rerun line')] if 'business rerun' in business else []
+    areas = [area.get('area') for area in inputs['rules-pages.json']['areas']]
+    bad_line = False
+    for line in reruns:
+        match = re.fullmatch(r'business rerun for (.+), ([0-9]{4}-[0-9]{2}-[0-9]{2}), head (' + HEX + ')', line)
+        if not match or match[1] not in areas or match[3].lower() != identity['head'].lower():
+            bad_line = True
+            continue
+        try:
+            date.fromisoformat(match[2])
+        except ValueError:
+            bad_line = True
+    failures = [('rerun-line', 'rerun needs a known area, ISO date, and PR head')] if bad_line else []
+    if any(isinstance(area, str) and area not in business for area in areas):
+        failures.append(('rerun-business', 'business must name every touched area'))
+    words = {entry.get('word') for entry in inputs['check-record.json']['entries']
+             if entry.get('mode') == 'security' and isinstance(entry.get('word'), str)}
+    security = [verdict_word(verdict) for verdict in line_values(lines, 'security')]
+    if (('must fix' in words and any(word != 'fail' for word in security)) or
+            ('incomplete' in words and 'pass' in security)):
+        failures.append(('rerun-security', 'security must preserve must fix and incomplete entries'))
+    return failures
+
+
+def packet_type_failures(lines, inputs):
+    # Common checks own malformed identity keys and plain bad verdict words.
+    if bad_identity_keys(lines) or bad_verdicts(lines):
+        return []
+    identity = dict(pair.strip().split('=', 1) for pair in line_values(lines, 'identity')[0].split(';')
+                    if '=' in pair)
+    identity = {key: text.strip() for key, text in identity.items()}
+    verdicts = {field: next(iter(line_values(lines, field)), '')
+                for field in ['size', 'business', 'security', 'health', 'money']}
+    bodies = field_bodies(lines)
+    failures = rerun_failures(lines, inputs, identity)
+    if identity['mode'] != 'full':
+        return failures + single_failures(verdicts, bodies, identity)
+    identity_index = next(index for index, line in enumerate(lines) if line.startswith('identity:'))
+    cap = CAP_LINE in lines[:identity_index]
+    if any(line.startswith('reviewed over the cap') for line in lines) and not cap:
+        failures.append(('override-cap-line', 'the exact cap line must appear above identity'))
+    size_fail = verdict_word(verdicts['size']) == 'fail'
+    stopped = all(verdicts[field].startswith(CAP_STOP) for field in ['business', 'security', 'health'])
+    if size_fail and not cap and stopped:
+        return failures + short_failures(verdicts, bodies, inputs['split-plan.json'])
+    if size_fail and not cap:
+        failures.append(('cross-size-fail', 'size fail with other lines not not checked needs the reviewed over the cap line, or a size mode packet'))
+    if cap:
+        if not size_fail:
+            failures.append(('override-size-fail', 'reviewed over the cap requires size fail'))
+        if any(verdicts[field].startswith('not checked: PR over the cap')
+               for field in ['business', 'security', 'health']):
+            failures.append(('override-not-checked', 'override verdicts must not stop at the cap'))
+    return failures + full_failures(verdicts, bodies, identity['head'])
+
+
 def main(args):
     if len(args) != 1:
         raise ValueError('usage: packet_check.py <packet folder>')
@@ -324,7 +504,8 @@ def main(args):
         raise ValueError('packet.md is empty')
     inputs, missing = read_inputs(folder)
     lines = text.splitlines()
-    failures = rule_failures(text) + record_failures(lines, inputs) + split_failures(lines, inputs)
+    failures = (rule_failures(text) + record_failures(lines, inputs) + split_failures(lines, inputs)
+                + packet_type_failures(lines, inputs))
     if missing and not failures:
         failures.append(('input-fields', 'missing fields: ' + ', '.join(missing)))
     for rule, message in failures:
