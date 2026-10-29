@@ -29,8 +29,8 @@ stop, the same as for `ROLE.md`.
 Each rule lives on 1 card. This list names them; the card holds the rule, its
 source, and when it applies.
 
-- `DEV-P01` A code change over 300 changed lines, tests not counted, stops and
-  gets split.
+- `DEV-P01` A code change over 300 changed lines, tests, lock files, generated
+  files and docs not counted, stops and gets split.
 - `DEV-P02` Proof first: a failing test before a fix, passing tests after.
 - `DEV-P03` If the tester role was on in this session, change nothing in the
   source checkout.
@@ -74,8 +74,8 @@ A task is finished when each line has its evidence.
 
 - [ ] Mode named, and the mode file's own checklist done.
 - [ ] Architecture doc found (path) or flagged as missing (`DEV-P04`).
-- [ ] Start state quoted; end `git diff --stat` quoted; changed lines outside
-      tests counted (`DEV-P01`).
+- [ ] Start state quoted; end `git diff --stat` quoted; changed lines counted,
+      leaving out tests, lock files, generated files and docs (`DEV-P01`).
 - [ ] Test runs quoted: failing before, passing after (`DEV-P02`).
 - [ ] Every commit, push, deploy or install: the user's yes quoted, or the line
       "none made" (`DEV-P06`).

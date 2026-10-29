@@ -25,9 +25,9 @@ O19): stop and ask the user.
   plain entries on the same line still count.
 - A line `Checked at:` names the commit the statuses describe.
 - Each rule is a line that starts `R<n>.` and carries exactly 1 status word in
-  bold: `match`, `gap`, `owner` or `open`. A rule with 2 statuses is
-  "multiple" and stays unread, and so is a rule with none (settled 2026-10-27,
-  B15): write `not checked: rule <id> has <2 statuses
+  bold: `match`, `gap`, `owner` or `open`. A rule with 2 statuses stays
+  unread ("multiple"). So does a rule with none (settled 2026-10-27, B15).
+  For either, write `not checked: rule <id> has <2 statuses
   or no status>` and make that area incomplete.
 - A page with no `Covers:` line in its first 5 lines is not applied. Write
   `not checked: page has no Covers line` and make that area incomplete.
@@ -54,12 +54,12 @@ Before each step, run `cards.py reviewer business <step number>`, for example
    these already exist: reuse them.
 3. **Map files to areas.** Run the page tool with the frozen values:
    `python tools/business_pages.py --repo <checkout> --base <comparison base> --head <PR head> --default-ref <default commit> [--drafts <drafts folder>] --out <packet folder>`.
-   It reads changed files with rename detection on (a rename is checked by
-   its old path and its new path against every Covers line), reads each page,
-   and writes `runs/business-map.json`, `rules-pages.json` and a copy of
-   every page used in `runs/`. Exit 1 means git failed: write
+   It reads the changed files with rename detection on. A rename is checked by
+   its old path and its new path against every Covers line. The tool reads
+   each page. It writes `runs/business-map.json`, `rules-pages.json` and a
+   copy of every page used in `runs/`. Exit 1 means git failed: write
    `business: not checked: mapping failed, <the stderr line>`, never a pass.
-   Copy its one line of output into the packet's check notes.
+   Copy its 1 line of output into the packet's check notes.
    Page and mapping cards: `REV-201` to `REV-205`, `REV-207` to `REV-209`.
 4. **Areas with no page, and the no area found list.** Read
    `business-map.json`.
@@ -115,9 +115,9 @@ Before each step, run `cards.py reviewer business <step number>`, for example
    `{"areas":[{"area":"...","state":"...","reason":"..."}]}`. Include every
    touched area, each area once. Then run
    `python tools/business_verdict.py verdict --areas runs/business-areas.json`
-   and use its line as the business line, as it is. Fail if any area fails;
-   else incomplete if any area is not checked or depends on something; else
-   pass. A rerun's verdict is rebuilt the same way from every area.
+   and use its line as the business line, as it is. The rule: fail if any
+   area fails. Otherwise incomplete if any area is not checked or depends on
+   something. Otherwise pass. A rerun's verdict is rebuilt the same way from every area.
    Business verdict card: `REV-231`.
 8. **Write the packet.** `packet.md` in the packet format the packet check
    reads (ROLE.md and the size mode file give the shape). For a business run
@@ -166,10 +166,10 @@ Before each one, run `cards.py reviewer business <step number>`, for example
    Not checked.
    Rerun start and hash cards: `REV-233`, `REV-236`, `REV-239`.
 21. **RR2. Read the same commits.** Use the base and default commits the tool
-   printed, never a newer default branch head. Run step 3 with them, with the
-   area's new page (a new draft in the drafts folder, or the page now on the
-   default branch commit named in the identity line; a page merged after the
-   first run is not on that commit, so use the draft).
+   printed, never a newer default branch head. Run step 3 with them and with the
+   area's new page. The new page is a new draft in the drafts folder, or the
+   page now on the default branch commit named in the identity line. A page
+   merged after the first run is not on that commit, so use the draft.
    Rerun reading card: `REV-234`.
 22. **RR3. Replace the area.** Redo steps 4 to 6 for that area only. Replace that
    area's entries by their `area` field in every field of the packet, in

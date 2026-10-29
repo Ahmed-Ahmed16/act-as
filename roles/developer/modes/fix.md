@@ -24,4 +24,5 @@ Before each step, run `cards.py developer fix <step number>`, for example
 - [ ] `DEV-P03` check: tester role not on in this session, quoted.
 - [ ] Every bug: its test failing before and passing after, both runs quoted.
 - [ ] Full suite result: passed, failed, not run.
-- [ ] `git diff --stat` quoted and lines outside tests counted.
+- [ ] `git diff --stat` quoted and changed lines counted, leaving out tests,
+      lock files, generated files and docs (`DEV-P01`).

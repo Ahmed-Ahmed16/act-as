@@ -1,6 +1,6 @@
 # Reviewer mode: health
 
-Ask one thing: will this change hurt to change later? Health has 10 checks
+Ask 1 thing: will this change hurt to change later? Health has 10 checks
 here (H1 to H10). Each check has a tool part and a reading part. A tool hit
 alone is never a finding. This mode runs no size, business or security check.
 
@@ -42,8 +42,8 @@ code alone says nothing:
 - PHPStan exits 1 for findings and for boot errors alike. The script reads the text.
 - An empty jscpd scan exits 0 and looks clean. The script reads the scanned
   file count. 0 files is `not checked`, never `clean`.
-- A PR's own `.jscpd.json` is read by jscpd on its own. Always pass the
-  role's own settings with `--config`, and still read the file count.
+- jscpd picks up a PR's own `.jscpd.json` without being asked. Always pass
+  the role's own settings with `--config`, and still read the file count.
 - PHPMD gives exit 0 with no output on a folder with 0 PHP files. Count the
   files you pass.
 
@@ -65,7 +65,7 @@ Before each step, run `cards.py reviewer health <step number>`, for example
    changed lines, for questions 11, 16 and 18. Report only what the PR added,
    or what it left behind in an area it touched. A problem in an untouched
    part of the same file is not reported. The tool calls must show the whole
-   file was read. For each finding write one of: "PR added it", "PR left it
+   file was read. For each finding write 1 of: "PR added it", "PR left it
    in a touched area". If neither is true, drop it.
    Whole file reading cards: `REV-447`, `REV-448`.
 3. **H1 Copied logic.** Tool: jscpd with `--baseline-from-ref <comparison
@@ -73,7 +73,7 @@ Before each step, run `cards.py reviewer health <step number>`, for example
    report json with `-r json`. Classify with `health_parse.py jscpd`. Reading:
    short copies jscpd cannot see, such as the same 2 line "card is active"
    check typed in 3 controllers and again in an export (question 18). The
-   clone count is a floor.
+   clone count is a floor: the real number can be higher.
    Copied logic cards: `REV-401` to `REV-403`.
 4. **H2 Long methods and files.** Tool: PHPMD `ExcessiveMethodLength` and
    `ExcessiveClassLength` (1 class, not a whole file) on the changed PHP
@@ -97,7 +97,8 @@ Before each step, run `cards.py reviewer health <step number>`, for example
    finding.
    Controller query card: `REV-408`.
 7. **H5 N+1.** No tool. Reading: a lazy loaded relation read inside a loop
-   over many rows. Always a `lead`, never `finding` and never `must fix`.
+   over many rows. For example, `$order->customer` read inside a `foreach`
+   over 500 orders. Always a `lead`, never `finding` and never `must fix`.
    Lazy relation card: `REV-409`.
 8. **H6 Risky areas with no tests.** Risky means money, logins, deleting data,
    plus the risky areas from the business step. In a health only run there is
@@ -133,7 +134,8 @@ Before each step, run `cards.py reviewer health <step number>`, for example
     Dead code cards: `REV-415` to `REV-417`.
 11. **H9 Bugs.** Tool: PHPStan with Larastan at level 5, classified by
     `health_parse.py phpstan`. A line saying an ignored pattern "was not
-    matched" is a stale baseline entry, not a bug; report the count. A run
+    matched" is a stale baseline entry (an old ignore rule that matches nothing now),
+    not a bug; report the count. A run
     whose only issues are stale baseline entries is `clean`, with that count.
     Reading:
     open every error and confirm it. A bug the PR adds, once confirmed, is
@@ -149,16 +151,20 @@ Before each step, run `cards.py reviewer health <step number>`, for example
     the head. Next to it, ask question 11 for the riskiest rule the PR touches.
     Cost and design burden cards: `REV-422` to `REV-424`.
 13. **Laravel reading prompts.** Read, for the changed files that fit:
-    migrations (existing rows, order, rollback, a column change that drops its
-    modifiers); config and env (`env()` outside config files breaks under
-    config caching); queues, jobs and events (retries, old payloads, a job
-    that starts before the transaction commits); Blade views and the code that
-    calls them; changed JavaScript that carries the same behaviour as PHP.
-    Also three named steps: L2 (a case the code misses), L3 (behaviour that
+    - migrations (existing rows, order, rollback, a column change that drops
+      its modifiers);
+    - config and env (`env()` outside config files breaks under config
+      caching);
+    - queues, jobs and events (retries, old payloads, a job that starts
+      before the transaction commits);
+    - Blade views and the code that calls them;
+    - changed JavaScript that carries the same behaviour as PHP.
+
+    Also 3 named steps: L2 (a case the code misses), L3 (behaviour that
     worked before and now does not), L4 (a rule copied in 2 places that drifts
     apart). A refactor PR needs a record of old behaviour: tests that pass
-    unchanged on base and head, or the output of base and head on 1 case at
-    least (question 31). Each prompt ends in a result word.
+    unchanged on base and head, or the output of base and head on at least
+    1 case (question 31). Each prompt ends in a result word.
     Laravel reading cards: `REV-431` to `REV-441`.
     Edge case, old behaviour and copied rule cards: `REV-442` to `REV-444`.
 14. **Fixed lists and limits typed in 2 or more places (G1, G2).** This links
@@ -168,7 +174,7 @@ Before each step, run `cards.py reviewer health <step number>`, for example
     It also finds the config key or language key that holds the same text.
     Name every other copy as `path:line`. Then read: a copy counts only when
     both copies express the same rule (same knowledge, not just the same
-    text). Two equal lists that mean different things count as neither.
+    text). 2 equal lists that mean different things count as neither.
     Result: a `finding` when the PR adds a new copy; a pointer when the copy
     was already there and the PR only touched its file. It is `must fix` only
     with a shown burden (the PR made the 2nd copy) and a small fix named in
@@ -186,11 +192,16 @@ Before each step, run `cards.py reviewer health <step number>`, for example
     A probe that exits non zero gives `not checked: probe did not run`.
     The tool works only in a throwaway copy, with the network off. It never
     writes to the checkout (`REV-P01`, `REV-P03`); if the checkout changes, it
-    stops. Per test, it does these in order: a green run first; proof that the
-    test ran (at least 1 test and 1 assertion); the fault; the same test run
-    unchanged; the red must be an assertion failure, and its message is kept;
-    the copy is reset and compared with the checkout; the test runs green
-    again. The fault must contradict what the test asserts. Never a syntax
+    stops. Per test, it does these in order:
+    - a green run first (the test passes);
+    - proof that the test ran (at least 1 test and 1 assertion);
+    - the fault (a small break in the code);
+    - the same test run unchanged (red means it fails); the red must be an
+      assertion failure, and its message is kept;
+    - the copy is reset and compared with the checkout;
+    - the test runs green again.
+
+    The fault must contradict what the test asserts. Never a syntax
     error. The spec holds a probe command that shows the asserted behaviour
     before and after the fault. How to read the result per test:
     - Green with the fault, and the probe shows the behaviour changed: the test
@@ -205,7 +216,7 @@ Before each step, run `cards.py reviewer health <step number>`, for example
       fetch it): write `not checked: tests cannot run here`. Do not install
       anything to make them run.
     - Red on the assertion, reset, green again: `clean` for that test.
-    The 2 `not checked` results make health `incomplete`. The result covers only
+    The 3 `not checked` results make health `incomplete`. The result covers only
     the tests picked: say "covers N picked tests" and never "the tests are good".
     The command, the fault and the result stay in `independent-check.json`,
     apart from the CI evidence; Known risks names that file.
@@ -255,10 +266,12 @@ Before each step, run `cards.py reviewer health <step number>`, for example
     fine, a plain list of menu entries" or "55 line method: problem, it does
     3 jobs (question 17)". A guard finding that is not a number stays a
     finding. A pointer never passes or fails health. The pointer map:
-    a long new method, question 6; a small change inside a method that is
-    already long, question 17; a long class, questions 12 and 11; many routes
-    on 1 controller, questions 12 and 13; a copy, question 18. Question 12
-    loads only through step 21.
+    - a long new method: question 6;
+    - a small change inside a method that is already long: question 17;
+    - a long class: questions 12 and 11;
+    - many routes on 1 controller: questions 12 and 13;
+    - a copy: question 18.
+    Question 12 loads only through step 21.
     Pointer judgement cards: `REV-449`, `REV-450`.
 18. **The review questions.** Ask these 16 on every run, and answer each with
     1 line and a file:line, or "nothing to say":
@@ -280,18 +293,24 @@ Before each step, run `cards.py reviewer health <step number>`, for example
     22. Does it follow the style of the code around it?
     23. Would the tests fail if the code broke?
 
-    Ask question 5 when the diff has heavy special cases, question 9 when
-    comments say what instead of why, and question 21 when a refactor is
-    mixed into a feature PR. Ask question 6 (methods so small the reader
-    jumps around) only when a pointer points there. Ask question 31 (a refactor
-    needs a record of old behaviour and proof) when the PR is a refactor or
-    cleanup. Ask question 32 (docs updated when behaviour or setup changed)
-    when the `docs-guard` trigger fires, and also when the PR adds behaviour
-    that no document mentions. Question 12 (1 actor per class) is not 1 of
-    the 16. Ask it only when the pointer map in step 17 sends you there, and
-    then run step 21 to load its card. Questions 14 and 19 are not asked in v1 (open). Questions 24 to 29
-    belong to size and the packet; question 30 belongs to security. A design
-    opinion with no shown harm is a pointer, never a finding.
+    Ask these extra questions only when their trigger fires:
+    - Question 5, when the diff has heavy special cases.
+    - Question 9, when comments say what instead of why.
+    - Question 21, when a refactor is mixed into a feature PR.
+    - Question 6 (methods so small the reader jumps around), only when a
+      pointer points there.
+    - Question 31 (a refactor needs a record of old behaviour and proof),
+      when the PR is a refactor or cleanup.
+    - Question 32 (docs updated when behaviour or setup changed), when the
+      `docs-guard` trigger fires, and also when the PR adds behaviour that no
+      document mentions.
+    - Question 12 (1 actor per class) is not 1 of the 16. Ask it only when
+      the pointer map in step 17 sends you there, and then run step 21 to
+      load its card.
+
+    Questions 14 and 19 are not asked in v1 (open). Questions 24 to 29 belong
+    to size and the packet. Question 30 belongs to security. A design opinion
+    with no shown harm is a pointer, never a finding.
     Default question cards: `REV-501` to `REV-504`, `REV-507`, `REV-508`,
     `REV-510`, `REV-511`, `REV-513` to `REV-518`, `REV-520`, `REV-521`.
     Conditional question cards: `REV-505`, `REV-506`, `REV-509`, `REV-519`,

@@ -1,7 +1,7 @@
 # Reviewer mode: security
 
-Ask one question: can someone abuse this change now? A tool finds the spot.
-Reading decides. The tools and searches below are examples, not the edge of
+Ask 1 question: can someone abuse this change now? A tool finds the spot.
+Reading decides. The tools and searches below are examples, not the limit of
 the review. Also read the removed lines and the callers of changed code.
 
 This mode runs 24 checks: S1 to S22, L1 and L5. It also fills the money
@@ -26,9 +26,12 @@ Before each step, run `cards.py reviewer security <step number>`, for example
 2. **Run the tools.** Rule: `REV-P05`. Command:
    `python tools/security_scan.py tools --repo <checkout> --head <PR head> --files <packet folder>/files.json --out <packet folder>/runs`
    It runs 3 tools in the 1 reviewer image (its name is in the output; write
-   it in the packet): Semgrep on the added and changed files only, never the
-   whole project; `composer audit` on the head lock file; gitleaks on the head
-   files. The scan folder holds the exact Git blobs. Export attributes cannot
+   it in the packet):
+   - Semgrep on the added and changed files only, never the whole project.
+   - `composer audit` on the head lock file.
+   - gitleaks on the head files.
+
+   The scan folder holds the exact Git blobs. Export attributes cannot
    omit or rewrite them. Composer advisories are counted from its JSON output.
    Container rules, all of them:
    - Every container is named `actas-t33-<tool>-<pid>` and run with `--rm`.
@@ -57,10 +60,10 @@ Before each step, run `cards.py reviewer security <step number>`, for example
    `python tools/security_scan.py finders --repo <checkout> --base <comparison base> --head <PR head> --out <packet folder>/runs`
    It writes `runs/security-finders.json`: search hits for each check, on
    added lines, and on removed lines for S22. A hit is only a place to read.
-   No hit does not clear a check: still read the changed code. The key shaped
-   hits are redacted. Never print or copy a secret into any file.
+   No hit does not clear a check: still read the changed code. Hits that
+   look like keys are redacted. Never print or copy a secret into any file.
 4. **Read the 24 checks.** Read in this order: L5 first, then S1 to S22, then
-   L1. For each check, write one entry in `check-record.json` with the id,
+   L1. For each check, write 1 entry in `check-record.json`. It holds the id,
    `mode: security`, the tool part (hits or tool result, or "no tool"), the
    reading part (what you read and the answer), and a word:
    `must fix`, `finding`, `lead`, `pass`, or `incomplete`. A check that does not
@@ -102,7 +105,7 @@ Before each step, run `cards.py reviewer security <step number>`, for example
      read by hand.
    - **S14, shell command.** Does user input reach it? The Semgrep rule is
      `php.lang.security.injection.tainted-exec.tainted-exec`. Its sources are
-     PHP superglobals only, so for Laravel input this check rests on the
+     PHP superglobals only (such as `$_GET`), so for Laravel input this check rests on the
      search hits and your reading.
    - **S15, `unserialize`, `eval`, `extract`.** Does user input reach it?
    - **S16, a file path from user input.** `basename` only, inside 1 allowed
@@ -124,7 +127,7 @@ Before each step, run `cards.py reviewer security <step number>`, for example
      `where('user_id'`. Was a reason given? Does something else now guard it?
    - **L1, steps in the wrong order.** No tool. A repeat request, 2 parallel
      requests, an unknown payment result. A database transaction does not
-     make an outside charge atomic.
+     make an outside charge all or nothing.
    L2, L3 and L4 live in health. When one touches access, money or private
    data, report it here as a security finding too.
    Access cards: `REV-301` to `REV-307`.
@@ -167,9 +170,10 @@ Before each step, run `cards.py reviewer security <step number>`, for example
    The brief is a draft. It is never sent and never started.
 7. **Verdict.** The security line is `security: <word> <reason>`.
    - `fail`: 1 or more `must fix` entries. The run goes on after a fail.
-   - `incomplete`: no `must fix`, but a check, or the tool part of a check, is
-     "not checked", or a finding says `depends on: <x>` and its harm is money,
-     accounts or other users' data. Write `merge only after: <x>`.
+   - `incomplete`: no `must fix`, and 1 of these is true. A check, or the tool
+     part of a check, is "not checked". Or a finding says `depends on: <x>`
+     and its harm is money, accounts or other users' data. Write
+     `merge only after: <x>`.
    - `pass`: every check that applies ran, no `must fix`. Ordinary findings
      allow a pass.
    Fail comes before incomplete. A locked Laravel major that is past its
@@ -182,12 +186,12 @@ Before each step, run `cards.py reviewer security <step number>`, for example
    lines each say `not asked: security run only`. Tests run says
    `not asked: security run only`. Split plan says
    `not needed: security run only`. The security line is step 7, the money
-   line is step 6. Behaviour changed, Files that matter most, Not checked
-   (every tool that did not run, with its reason, and at least the other three
-   modes), Known risks (the security entries), Pointers, and Drafts, not sent
-   (the message to the author, never sent; the Opus brief when the money line
-   says yes) all have real content. In a full run the full mode file calls this
-   mode and merges these entries into the one packet.
+   line is step 6. These fields all have real content: Behaviour changed;
+   Files that matter most; Not checked (every tool that did not run, with its
+   reason, and at least the other 3 modes); Known risks (the security
+   entries); Pointers; Drafts, not sent (the message to the author, never
+   sent; the Opus brief when the money line says yes). In a full run the
+   full mode file calls this mode and merges these entries into the 1 packet.
 9. **Packet check.** `python tools/packet_check.py <packet folder>` after the
    last write. Exit 0 prints `packet_check: pass`. Anything else: repair and run
    again, or withhold the packet. Show a packet only after it passes (`REV-P08`).
@@ -209,7 +213,7 @@ Default rules (O10, not yet confirmed): the same as "rerun business".
    "page changed since the first run".
 4. Replace only that area's security entries (check record, Known risks,
    Pointers, Not checked, Drafts). Do not run size, business or health again.
-   Do not re run the tools unless the user asks.
+   Do not rerun the tools unless the user asks.
 5. Security line rule: a first run `fail` stays `fail`, with
    `also: rerun security for <area>` added when that rerun is still open. An
    `incomplete` stays `incomplete`. A `pass` becomes `incomplete` with

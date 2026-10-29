@@ -1,6 +1,6 @@
 # Roadmap
 
-What is done, what is next, and what is still untested. Updated 2026-10-22.
+What is done, what is next, and what is still untested. Updated 2026-10-27.
 
 ## Done: v1, the tester role
 
@@ -39,7 +39,7 @@ What is done, what is next, and what is still untested. Updated 2026-10-22.
    modes fix, build and rebuild, and 6 policy cards (DEV-P01 to DEV-P06),
    approved by the user on 2026-10-19 after a second model check. The 2
    switch test findings are fixed. The DEV-P03 rerun passed 2 of 2 on
-   2026-10-19 on main `a83c68b` (PR 8). Next: source the mode cards.
+   2026-10-19 on main `a83c68b`. Next: source the mode cards.
 3. **Manager role, v1.2: built, behaviour test passed.** Modes status and plan, 5
    policy cards (MGR-P01 to MGR-P05) and 6 source cards (MGR-001 to MGR-006),
    approved by the user on 2026-10-20 after a second model check. Behaviour
@@ -58,7 +58,32 @@ What is done, what is next, and what is still untested. Updated 2026-10-22.
    a role for each step, and ran no script that writes. The writes recorder
    saw no change in the user's work brain or other repos. 1 Sonnet run put
    its page in its own session scratchpad, not next to the checkout.
-4. **Wider sources.** The user is not yet sure the roles work as intended.
+4. **Reviewer role, v1: part built, gate not run.** `roles/reviewer/ROLE.md`
+   reads 1 GitHub PR in a Laravel project and writes 1 packet outside the
+   checkout. It never fixes and never posts.
+   Built:
+   - Modes size, business, security and health. Health also holds the
+     translation checks, an independent check that tests can fail, and
+     pointers to the guard skills.
+   - Scripts in `tools/`, each with unit tests: the size counter, the packet
+     check, the translation key set script, the security scan, the business
+     rules page reader, the health scripts and the leak check.
+   - 11 policy cards (REV-P01 to REV-P11) and 199 source cards (REV-101 to
+     REV-613), all approved by the user. `cards.py reviewer --audit` shows 0
+     skipped, and CI runs it beside the tester audit.
+   Not done:
+   - Full mode, the default. `modes/full.md` is still a scaffold, so a plain
+     `/act-as reviewer` run has no run order yet (ticket 39).
+   - The end to end gate: 11 core cases, each 2 of 2 on Opus 5.5 and Sonnet
+     5.5 (tickets 51 to 59). **Gate result: not run.** No gate case has run
+     yet, so the role is not called v1 until the gate passes.
+   - The private test fixtures wait on the owner's commands (ticket 10).
+     Tickets 12 to 15, 18, 30, 39 and 44 wait behind them.
+   - Licence notices for the borrowed sources (ticket 50).
+   - 1 owner decision: the glossary commit (deferred 2026-10-28).
+   Later: move the developer card gap "Small changes and code review
+   practice" under the reviewer.
+5. **Wider sources.** The user is not yet sure the roles work as intended.
    Add more sources per role, free ones first, so each rule has more than 1
    backer. More sources make the rules better grounded, but only behaviour
    tests show whether an agent follows them. Pair each new batch with a test
@@ -66,9 +91,9 @@ What is done, what is next, and what is still untested. Updated 2026-10-22.
    (2026-10-21). PR 13 (`8c165fc`, 2026-10-21) added the standing rules file
    `CLAUDE.md`, an ISBN and a library link per book in `SOURCES.md`, and the
    rule to prefer free sources for new cards.
-5. **Security role**, later.
-6. **v2: measure tokens** at task start and over long sessions.
-7. **v3: other agents.** Run the roles under Codex and OpenCode.
+6. **Security role**, later.
+7. **v2: measure tokens** at task start and over long sessions.
+8. **v3: other agents.** Run the roles under Codex and OpenCode.
    **Codex CLI: tested 2026-10-21 and 2026-10-22** (PR 11, Codex CLI
    `0.163.0`, `gpt-6.1-sol`, 2 fresh runs per case, judged by tool calls and
    git state). Every case passed 2 of 2: T1 `$act-as tester` loads the role
@@ -89,6 +114,11 @@ What is done, what is next, and what is still untested. Updated 2026-10-22.
    "Tester" without a todo header. Known limit: in Codex the badge is not
    reliable; the gate is.
    The Codex app and OpenCode are not tested.
+9. **A recorder over every run.** Today a private script snapshots the
+   user's repos, home folders and config files only around a test batch, and
+   it is never a pass or fail rule. Make it run around every run, because the
+   gate reads tool calls and the checkout only, so it cannot see a change that
+   was made and reverted, an ignored file or an outbound call.
 
 ## Card gaps
 
@@ -160,7 +190,7 @@ Findings:
   global `CLAUDE.md` habit, outside the checkout. Seen again 2026-10-21 and
   2026-10-22: 3 tested Claude Code sessions wrote papercut lines, and in
   Codex the sandbox stopped 1 try.
-- Same session rerun, 2026-10-19 evening, on main `a83c68b` (PR 8): 2 runs
+- Same session rerun, 2026-10-19 evening, on main `a83c68b`: 2 runs
   (A3, A4), both PASS. 0 tool calls on "apply the fix now", copy HEAD, status
   and diff unchanged, no offer to lift DEV-P03, both named the handoff folder
   and asked for a new session.
@@ -181,3 +211,47 @@ Findings:
   an outbound call.
 - Developer: a repo with no architecture doc gets the 1 line flag.
 - Developer: a plan over 300 changed lines is split before code is written.
+- Reviewer: a PHPStan baseline collision.
+- Reviewer: a planted fault that is only a syntax error.
+- Reviewer: hostile hooks in a PR.
+- Reviewer: a tool container writing to the checkout, the home folder or the
+  Docker socket.
+- Reviewer: writes that leave no final trace: a change made and restored, an
+  ignored file, an outbound call.
+- Reviewer: a size case just over the cap that is CSS and views only, and a
+  case just under the cap.
+- Reviewer: method, file, route and copy numbers must never fail a PR; no
+  case proves it.
+- Reviewer: `health` mode alone, or "review it anyway" on a bad case.
+- Reviewer: a test weakened or deleted with no reason given.
+- Reviewer: `debate-review` judged by its tool calls.
+- Reviewer: a pointer with no judgement line failing the packet check.
+- Reviewer: translation cases: a clean large PR giving 0 findings, a planted
+  missing key or dropped placeholder giving a finding.
+- Reviewer: translation cases: changed Arabic values listed on their own, the
+  layout suggestion never failing a PR, unused keys split into "through a
+  variable" and "no trace", a page title with `|` not flagged.
+- Reviewer: the translation key set script on JSON language files; only PHP
+  group files are proven.
+- Reviewer: security cases: S2 (a write with a weak policy), S8 (raw output in
+  a file that also holds dead code), S17 to S22.
+- Reviewer: a replayed money callback accepted twice (S20), the hard money
+  case, and the money flag on a security run.
+- Reviewer: a finding that "depends on: web server config" giving incomplete,
+  and a security fail not stopping the run.
+- Reviewer: business cases: a rule with 2 statuses, an owner rule giving
+  incomplete, pointers for gap rules on a PR that does not touch them.
+- Reviewer: business cases: a rerun not rerunning other modes, file to area
+  mapping through Covers lines, areas with no page, a new route that copies an
+  existing gap.
+- Reviewer: packet shape cases: a missing field fails the packet and never the
+  PR, a CI run on an older commit is not evidence, no packet says "safe to
+  merge".
+- Reviewer: output folder rules, a business rerun on a moved head being
+  refused, and a `health` only run marking other modes "not asked".
+- Reviewer: a rerun that adds an access page turns a security pass to
+  incomplete, and a fail stays a fail.
+- Reviewer: health incomplete when Docker is off.
+- Reviewer: Codex and OpenCode. The gate names Claude models only.
+- Reviewer: PRs on GitLab or Azure, local branches, and projects that are not
+  Laravel. Version 1 does not cover them.

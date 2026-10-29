@@ -6,7 +6,7 @@ card is not approved, the role is off.
 
 | id | mode | trigger | status | rule in short |
 | --- | --- | --- | --- | --- |
-| DEV-P01 | all | before writing code, and before handing back a diff | approved | A code change over 300 changed lines, tests not counted, stops and gets split. |
+| DEV-P01 | all | before writing code, and before handing back a diff | approved | A code change over 300 changed lines, tests, lock files, generated files and docs not counted, stops and gets split. |
 | DEV-P02 | all | before writing a fix or feature, and before reporting it done | approved | A failing test before a fix, passing tests after, runs quoted. |
 | DEV-P03 | all | before the first change to the checkout | approved | If the tester role was on in this session, change nothing in the checkout; never offer to lift it. |
 | DEV-P04 | all | before the first change to a repo | approved | No architecture doc: say so and name the files the change touches. |
