@@ -345,7 +345,12 @@ class RealReviewerRoleTests(unittest.TestCase):
                 self.assertTrue(path.is_file(), str(path))
                 text = path.read_text(encoding='utf-8')
                 self.assertIn('## Steps', text.splitlines())
-                self.assertRegex(text.lower(), rf'(?m)^1\. [^\n]*filled by ticket {ticket}\b')
+                if 'filled by ticket' in text.lower():
+                    self.assertRegex(text.lower(), rf'(?m)^1\. [^\n]*filled by ticket {ticket}\b')
+                else:
+                    # A filled mode has real steps and a finish checklist instead.
+                    self.assertRegex(text, r'(?m)^1\. \*\*')
+                    self.assertIn('## Finish checklist', text.splitlines())
 
     def test_unreadable_reviewer_role_file_turns_the_role_off(self):
         self.assertTrue(self.role.is_dir(), str(self.role))
