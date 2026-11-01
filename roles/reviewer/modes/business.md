@@ -52,7 +52,13 @@ Before each step, run `cards.py reviewer business <step number>`, for example
    `business: not checked: default branch not fetched` and stop.
 2. **Packet folder and first snapshot.** As size mode step 2. In a full run
    these already exist: reuse them.
-3. **Map files to areas.** Run the page tool with the frozen values:
+3. **Map files to areas.** First find the drafts folder: the folder the
+   private overlay names, else `rules-drafts-<owner>-<repo>` next to the
+   checkout. For a checkout at `D:/work/shop` of repo `acme/shop`, that is
+   `D:/work/rules-drafts-acme-shop`. Check it with `ls <that folder>`. If it
+   exists, pass it as `--drafts`. If not, write 1 Not checked line
+   `drafts: no drafts folder at <path>` and run without `--drafts`.
+   Then run the page tool with the frozen values:
    `python tools/business_pages.py --repo <checkout> --base <comparison base> --head <PR head> --default-ref <default commit> [--drafts <drafts folder>] --out <packet folder>`.
    It reads the changed files with rename detection on. A rename is checked by
    its old path and its new path against every Covers line. The tool reads
